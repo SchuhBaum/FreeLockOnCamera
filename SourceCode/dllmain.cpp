@@ -28,20 +28,20 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
 	assembly_location = SigScan(vanilla);
     if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
     
-    // vanilla:
-    // switching locked-on targets requires the mouse to be moved faster than a threshold speed;
-    // 72 3a                --  jb <current_address+3a>
-    // 0f2f 15 9abe2c02     --  comiss xmm2,<current_address+022cb39a>
-    // 76 31                --  jna <current_address+31>                <-- nop this
-    //
-    // modded:
-    // remove the jump when the threshold is not met; this is still bad since it 
-    // reacts to moving the mouse rather than the exact camera position; too janky
-    // for my taste;
-    vanilla = { 0x72, 0x3a, 0x0f, 0x2f, 0x15, 0x9a, 0xbe, 0x2c, 0x02, 0x76, 0x31 };
-    modded = { 0x72, 0x3a, 0x0f, 0x2f, 0x15, 0x9a, 0xbe, 0x2c, 0x02, 0x90, 0x90 };
-	assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    // // vanilla:
+    // // switching locked-on targets requires the mouse to be moved faster than a threshold speed;
+    // // 72 3a                --  jb <current_address+3a>
+    // // 0f2f 15 9abe2c02     --  comiss xmm2,<current_address+022cb39a>
+    // // 76 31                --  jna <current_address+31>                <-- nop this
+    // //
+    // // modded:
+    // // remove the jump when the threshold is not met; this is still bad since it 
+    // // reacts to moving the mouse rather than the exact camera position; too janky
+    // // for my taste;
+    // vanilla = { 0x72, 0x3a, 0x0f, 0x2f, 0x15, 0x9a, 0xbe, 0x2c, 0x02, 0x76, 0x31 };
+    // modded = { 0x72, 0x3a, 0x0f, 0x2f, 0x15, 0x9a, 0xbe, 0x2c, 0x02, 0x90, 0x90 };
+	// assembly_location = SigScan(vanilla);
+    // if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
 
     // vanilla:
     // initializes the lock-on angle to 0.7f (around 40? degrees); this makes many 
@@ -75,6 +75,37 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
     
     // vanilla:
+    // you can only toggle the lock-on off when you currently are locked-on;
+    // 80 b9 30 28 00 00 00     --  cmp byte ptr [rcx+00002830],00
+    // 0f 94 c0                 --  sete al
+    //
+    // modded:
+    // ignore the variable that checks if you are currently locked-on and
+    // instead check the toggle variable;
+    // 80 b9 31 28 00 00 00     --  cmp byte ptr [rcx+00002831],00
+    // 0f 94 c0                 --  sete al
+    vanilla = { 0x80, 0xb9, 0x30, 0x28, 0x00, 0x00, 0x00, 0x0f, 0x94, 0xc0 };
+    modded = { 0x80, 0xb9, 0x31, 0x28, 0x00, 0x00, 0x00, 0x0f, 0x94, 0xc0 };
+	assembly_location = SigScan(vanilla);
+    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    
+    // vanilla:
+    // you lose your toggle after performing a critical hit;
+    // e8 59 e8 91 ff           --  call <+ff91e859>
+    // 84 c0                    --  test al,al
+    // 74 41                    --  je <+41>
+    //
+    // modded:
+    // skip the if-block by jumping always;
+    // e8 59 e8 91 ff           --  call <+ff91e859>
+    // 84 c0                    --  test al,al
+    // eb 41                    --  jmp <+41>
+    vanilla = { 0xe8, 0x59, 0xe8, 0x91, 0xff, 0x84, 0xc0, 0x74, 0x41 };
+    modded = { 0xe8, 0x59, 0xe8, 0x91, 0xff, 0x84, 0xc0, 0xeb, 0x41 };
+	assembly_location = SigScan(vanilla);
+    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    
+    // vanilla:
     // this variable has to do with setting a range value; when you are in close range
     // then the lock-on relies less on the camera direction;
     // f3 0f 58 ca                  --  xmm1,XMM2       
@@ -89,20 +120,40 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
 	assembly_location = SigScan(vanilla);
     if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
     
-    // // vanilla:
-    // // this function switches locked-on targets; it is called when you move the mouse;
-    // // 48 89 5c 24 20           --  mov [rsp+20],rbx    <-- return + nops
-    // // 55                       --  push rbp
-    // // 56                       --  push rsi
-    // // 41 57 48 8d 6c 24 90     --  lea rbp,[rsp-70]
-    // //    
-    // // modded:
-    // // focus on the same locked-on target => skip this function by returning 
-    // // immediately;
-    // vanilla = { 0x48, 0x89, 0x5c, 0x24, 0x20, 0x55, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0x90 };
-    // modded = { 0xC3, 0x90, 0x90, 0x90, 0x90, 0x55, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0x90 };
-	// assembly_location = SigScan(vanilla);
-    // if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    // vanilla:
+    // this function switches locked-on targets; it is called when you move the mouse;
+    // 48 89 5c 24 20           --  mov [rsp+20],rbx    <-- return + nops
+    // 55                       --  push rbp
+    // 56                       --  push rsi
+    // 41 57 48 8d 6c 24 90     --  lea rbp,[rsp-70]
+    //    
+    // modded:
+    // focus on the same locked-on target => skip this function by returning 
+    // immediately;
+    vanilla = { 0x48, 0x89, 0x5c, 0x24, 0x20, 0x55, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0x90 };
+    modded = { 0xC3, 0x90, 0x90, 0x90, 0x90, 0x55, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0x90 };
+	assembly_location = SigScan(vanilla);
+    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    
+    // vanilla:
+    // there is the main(?) update function for lock-on targets; this part makes sure 
+    // that you don't switch after initiating a lock-on; after the compare statement
+    // the candidate gets the lowest rating;
+    // a8 20                --  test al,20
+    // 74 10                --  je <+10>
+    // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
+    //
+    // modded:
+    // skip this and leave everyone as a viable candidate; it seems to me that in 
+    // this function the lock-on target is chosen close to where you aim; the switch
+    // functions seems to me more concerned with you moving the mouse;
+    // a8 20                --  test al,20
+    // EB 10                --  jmp <+10>
+    // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
+    vanilla = { 0xa8, 0x20, 0x74, 0x10, 0x80, 0xbe };
+    modded = { 0xa8, 0x20, 0xeb, 0x10, 0x80, 0xbe };
+	assembly_location = SigScan(vanilla);
+    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
     
     // vanilla:
     // removes the lock-on when you don't look at the target with the camera;
