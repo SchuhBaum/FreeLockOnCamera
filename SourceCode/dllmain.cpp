@@ -2,6 +2,10 @@
 
 #include "ModUtils.h"
 #include "ini.h"
+#include "packages/DirectXHook/DirectXHook.h"
+// #include "packages/DirectXHook/UniversalProxyDLL.h"
+
+#include "Overlay/Crosshair.h"
 
 using namespace mINI;
 using namespace ModUtils;
@@ -9,9 +13,34 @@ using namespace ModUtils;
 const std::string author = "SchuhBaum";
 const std::string version = "0.0.3";
 
+static Renderer renderer;
+static DirectXHook direct_x_hook(&renderer);    
+static Crosshair crosshair;
+
+static Logger logger{ "DllMain" };
+
+void OpenDebugTerminal()
+{
+	std::fstream terminalEnableFile;
+	terminalEnableFile.open("hook_enable_terminal.txt", std::fstream::in);
+	if (terminalEnableFile.is_open())
+	{
+		if (AllocConsole())
+		{
+			freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+			SetWindowText(GetConsoleWindow(), (LPCWSTR)"DirectXHook");
+		}
+		terminalEnableFile.close();
+	}
+}
+
 DWORD WINAPI MainThread(LPVOID lpParam) {
     Log("author " + author);
     Log("version " + version);
+
+    direct_x_hook.AddRenderCallback(&crosshair);
+    // direct_x_hook.SetDrawExampleTriangle(true);
+    direct_x_hook.Hook();
     
     std::vector<uint16_t> vanilla;
     std::vector<uint8_t> modded;
@@ -120,24 +149,25 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     // assembly_location = SigScan(vanilla);
     // if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
     
-    // // vanilla:
-    // // the height of the camera aims at the center of the player; for aiming it makes 
-    // // more sense that the camera aims at the head of the character; the offset is
-    // // stored in rax+0c and is equal to 1.45f;
-    // // 48 8b 01         --  mov rax,[rcx]
-    // // 48 85 c0         --  test rax,rax
-    // // 74 06            --  je <+06>
-    // // f3 0f10 40 0c    --  movss xmm0,[rax+0C]
-    // //
-    // // modded:
-    // // increase it to a constant of 1.75f (0x3fe00000);
-    // // b8 0000e03f      --  mov eax,3fe00000
-    // // 66 0f6e c0       --  movd xmm0,eax
-    // // 90 90 90 90      --  4x nop
-    // vanilla = { 0x48, 0x8b, 0x01, 0x48, 0x85, 0xc0, 0x74, 0x06, 0xf3, 0x0f, 0x10, 0x40, 0x0c };
-    // modded = { 0xb8, 0x00, 0x00, 0xe0, 0x3f, 0x66, 0x0f, 0x6e, 0xc0, 0x90, 0x90, 0x90, 0x90 };
-    // assembly_location = SigScan(vanilla);
-    // if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    // vanilla:
+    // the height of the camera aims at the center of the player; for aiming it makes 
+    // more sense that the camera aims at the head of the character; the offset is
+    // stored in rax+0c and is equal to 1.45f;
+    // 48 8b 01         --  mov rax,[rcx]
+    // 48 85 c0         --  test rax,rax
+    // 74 06            --  je <+06>
+    // f3 0f10 40 0c    --  movss xmm0,[rax+0C]
+    //
+    // modded:
+    // increase it to a constant of 2f (0x40000000);
+    // b8 00000040      --  mov eax,40000000
+    // 66 0f6e c0       --  movd xmm0,eax
+    // 90 90 90 90      --  4x nop
+    // 0 100 0000 0
+    vanilla = { 0x48, 0x8b, 0x01, 0x48, 0x85, 0xc0, 0x74, 0x06, 0xf3, 0x0f, 0x10, 0x40, 0x0c };
+    modded = { 0xb8, 0x00, 0x00, 0x00, 0x40, 0x66, 0x0f, 0x6e, 0xc0, 0x90, 0x90, 0x90, 0x90 };
+    assembly_location = SigScan(vanilla);
+    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
     
     // vanilla:
     // the score for selecting a lock-on target relies heavily on the distance to 
@@ -234,9 +264,27 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     return 0;
 }
 
+static HANDLE handle;
+
 BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
-    if (reason != DLL_PROCESS_ATTACH) return false;
-    DisableThreadLibraryCalls(module);
-    CreateThread(0, 0, &MainThread, 0, 0, NULL);
-    return true;
+    if (reason == DLL_PROCESS_ATTACH) {
+        OpenDebugTerminal();
+        DisableThreadLibraryCalls(module);
+        handle = CreateThread(0, 0, &MainThread, 0, 0, NULL);
+        return true;
+    }
+
+    if (reason == DLL_PROCESS_DETACH) {
+        // problem:
+        // the game does not exit when I use an overlay; these things do not work though;
+        //
+        // renderer.SetCommandQueue();
+        // direct_x_hook.UnhookCommandQueue();
+        // ExitThread(true);
+        // TerminateThread(handle, true);
+        // CloseLog(); //TODO
+        // direct_x_hook.UnhookCommandQueue();
+        return true;
+    }
+    return false;
 }
