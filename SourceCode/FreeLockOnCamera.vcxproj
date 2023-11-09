@@ -3,17 +3,21 @@
 
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <Version>0.0.3</Version>
+    <Version>0.0.4</Version>
     <RootNamespace>FreeLockOnCamera</RootNamespace>
   </PropertyGroup>
   
   <ItemGroup>
     <ClCompile Include="dllmain.cpp"/>
-    <ClCompile Include="Overlay/Crosshair.cpp"/>
-    <ClCompile Include="packages/DirectXHook/DirectXHook.cpp"/>
-    <ClCompile Include="packages/DirectXHook/Renderer.cpp"/>
-    <Link Include="d3d11.lib;d3d12.lib;D3DCompiler.lib"/>
+    <!-- <ClCompile Include="**/*.cpp"/> -->
+    <!-- <Link Include="d3d11.lib;d3d12.lib;D3DCompiler.lib"/> -->
   </ItemGroup>
+  
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
   
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -44,6 +48,6 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props"/>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets"/>
   
-  <Import Project="packages\directxtk_desktop_2019.2023.10.31.1\build\native\directxtk_desktop_2019.targets"/>
+  <!-- <Import Project="packages\directxtk_desktop_2019.2023.10.31.1\build\native\directxtk_desktop_2019.targets"/> -->
 
 </Project>
