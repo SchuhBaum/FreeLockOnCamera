@@ -218,23 +218,16 @@ void ApplyLockOnHealthBarMod() {
 void ApplyLockOnScoreMod() {
     Log("ApplyLogOnScoreMod");
     
-    // // vanilla:
-    // // the score for selecting a lock-on target relies heavily on the distance to 
-    // // the player;
-    // // f3 0f 58 ce  --  addss xmm1,xmm6
-    // // f3 0f 58 cf  --  addss xmm1,xmm7
-    // //
-    // // modded:
-    // // make score = cos(angle_to_camera), i.e. one if you aim exactly at it and lower
-    // // otherwise;
-    // // f3 0f10 4b 6c    --  movss xmm1,[rbx+6c]
-    // // 90 90 90         --  3x nop
-    // std::vector<uint16_t> vanilla = { 0xf3, 0x0f, 0x58, 0xce, 0xf3, 0x0f, 0x58, 0xcf };
-    // std::vector<uint8_t> modded = { 0xf3, 0x0f, 0x10, 0x4b, 0x6c, 0x90, 0x90, 0x90 };
-    // uintptr_t assembly_location = SigScan(vanilla);
-    // if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
-    
-    // load angle_to_camera instead of angle_to_player
+    // vanilla:
+    // uses angle_to_player for the score; this variable is saved at [rbx+64];
+    // f3 0f 10 43 64       --  movss xmm0,[rbx+64]
+    // f3 0f 10 4b 60       --  movss xmm1,[rbx+60]
+    //
+    // modded:
+    // use angle_to_camera instead of angle_to_player; this means that you lock onto 
+    // and switch to candidates that you look at with the camera;
+    // f3 0f 10 43 6c       --  movss xmm0,[rbx+6c]
+    // f3 0f 10 4b 60       --  movss xmm1,[rbx+60]
     std::vector<uint16_t> vanilla = { 0xf3, 0x0f, 0x10, 0x43, 0x64, 0xf3, 0x0f, 0x10, 0x4b, 0x60 };
     std::vector<uint8_t> modded = { 0xf3, 0x0f, 0x10, 0x43, 0x6c, 0xf3, 0x0f, 0x10, 0x4b, 0x60 };
     uintptr_t assembly_location = SigScan(vanilla);
@@ -242,12 +235,13 @@ void ApplyLockOnScoreMod() {
     
     LogSeparator();
 
-    // 48 c7 83 4c 29 00 00 00 00 f0 41
     // vanilla:
     // the score applies a multiplier on how well the player is facing the candidate;
+    // 48 c7 83 4c 29 00 00 00 00 f0 41     --  mov [rbx+294c],(float)30
     //
     // increase the score multiplier for angle_to_player; this means that the range 
     // has less effect and the angle has more on the final score;
+    // 48 c7 83 4c 29 00 00 00 00 34 43     --  mov [rbx+294c],(float)180
     vanilla = { 0x48, 0xc7, 0x83, 0x4c, 0x29, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x41 };
     modded = { 0x48, 0xc7, 0x83, 0x4c, 0x29, 0x00, 0x00, 0x00, 0x00, 0x34, 0x43 };
     assembly_location = SigScan(vanilla);
