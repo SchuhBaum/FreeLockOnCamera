@@ -1,6 +1,6 @@
 #include "custom.h"
 
-std::string custom::Add_Spaces_In_HexString(const std::string str) {
+std::string custom::Add_Spaces_To_HexString(const std::string str) {
     size_t str_size = str.size();
     std::stringstream result_stream;
     
@@ -20,6 +20,18 @@ std::string custom::Convert_Float_To_LowercaseHexString(const float value) {
     
     result_stream << std::hex << std::bitset<8*sizeof(uint32_t)>(t).to_ulong();
     return custom::Convert_String_To_Lowercase(result_stream.str());
+}
+
+std::vector<unsigned char> custom::Convert_SpacedHexString_To_UnsignedChar(std::string str) {
+    std::istringstream hex_char_stream(str);
+    std::vector<unsigned char> bytes;
+    bytes.reserve(str.length());
+    unsigned int i;
+
+    while (hex_char_stream >> std::hex >> i) {
+        bytes.push_back(i);
+    }
+    return bytes;    
 }
 
 std::string custom::Convert_String_To_Lowercase(std::string str) {

@@ -1,21 +1,26 @@
 #include "custom.h"
 #include "include/ini.h"
 #include "include/ModUtils.h"
+#include <sstream>
 
 using namespace custom;
 using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.0.6";
+const std::string version = "0.0.7";
 
 //
 // config
 //
 
-float angle_to_camera_score_multiplier = 6000;
-std::string Get_AngleToCameraScoreMultiplier_String() {
-    return Add_Spaces_In_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(angle_to_camera_score_multiplier)));
+bool only_use_camera_yaw_for_switching_lock_on_targets = true;
+
+float angle_to_camera_score_multiplier = 6000.0F;
+float camera_height = 1.45F;
+
+std::string Get_HexString(float f) {
+    return Add_Spaces_To_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(f)));
 }
 
 //
@@ -28,8 +33,11 @@ void Log_Separator() {
 
 void Log_Parameters() {
     Log("angle_to_camera_score_multiplier");
-    Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_AngleToCameraScoreMultiplier_String());
-    
+    Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_HexString(angle_to_camera_score_multiplier));
+    Log("camera_height");
+    Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
+    Log("only_use_camera_yaw_for_switching_lock_on_targets: ", only_use_camera_yaw_for_switching_lock_on_targets ? "true" : "false");
+
     Log_Separator();
     Log_Separator();
 }
@@ -43,12 +51,17 @@ void ReadAndLog_Config() {
     try {
         if (!config.read(ini)) {
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
+            ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
+            ini["FreeLockOnCamera"]["only_use_camera_yaw_for_switching_lock_on_targets"] = std::to_string(only_use_camera_yaw_for_switching_lock_on_targets);
             config.write(ini, true);
             Log_Parameters();
             return;
         }
         
         angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
+        camera_height = stof(ini["FreeLockOnCamera"]["camera_height"]);
+        std::string str = ini["FreeLockOnCamera"]["only_use_camera_yaw_for_switching_lock_on_targets"];
+        std::istringstream(str) >> std::boolalpha >> only_use_camera_yaw_for_switching_lock_on_targets;
         Log_Parameters();
         return;
     } catch(const std::exception& exception) {
@@ -116,21 +129,71 @@ void Apply_AngleToCameraMod() {
     
     Log_Separator();
 
+    // // vanilla:
+    // // uses the height difference from the candidate to the camera in angle_to_camera;
+    // // setting it to zero causes issues with locking onto targets behind cover;
+    // // f3 44 0f 5c 45 54        --  subss xmm8,[rbp+54]
+    // // f3 44 0f 11 45 44        --  movss [rbp+44],xmm8
+    // //
+    // // modded:
+    // // use the height difference to the player instead; otherwise the lock-on target 
+    // // might change simply by moving the camera up and down;
+    // // f3 44 0f 10 45 74        --  movss xmm8,[rbp+74]
+    // // f3 44 0f 11 45 44        --  movss [rbp+44],xmm8
+    // vanilla = "f3 44 0f 5c 45 54 f3 44 0f 11 45 44";
+    // modded = "f3 44 0f 10 45 74 f3 44 0f 11 45 44";
+    // assembly_location = AobScan(vanilla);
+    // if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    
+    // Log_Separator();
+    
     // vanilla:
-    // uses the height difference from the candidate to the camera in angle_to_camera;
-    // setting it to zero causes issues with locking onto targets behind cover;
-    // f3 44 0f 5c 45 54        --  subss xmm8,[rbp+54]
-    // f3 44 0f 11 45 44        --  movss [rbp+44],xmm8
-    //
+    // uses the height difference between the candidate and the camera;
+    // 48 8d 55 40                              --  lea rdx,[rbp+40]
+    // 48 8d 4d 80                              --  lea rcx,[rbp-80]
+    // e8 e2 38 a8 ff                           --  call NormalizeVector(...)
+    // 0f 28 10                                 --  xmm2,[rax]
+    //    
     // modded:
-    // use the height difference to the player instead; otherwise the lock-on target 
-    // might change simply by moving the camera up and down;
-    // f3 44 0f 10 45 74        --  movss xmm8,[rbp+74]
-    // f3 44 0f 11 45 44        --  movss [rbp+44],xmm8
-    vanilla = "f3 44 0f 5c 45 54 f3 44 0f 11 45 44";
-    modded = "f3 44 0f 10 45 74 f3 44 0f 11 45 44";
+    // instead of modding it I can change the value before it is normalized (function
+    // call) and restore it afterwards; this way the height difference is completely
+    // ignored but only for the score; way less janky;
+    // f3 0f 10 75 44                           --  movss xmm6,[rbp+44]
+    // f3 0f 11 55 44                           --  movss [rbp+44],xmm2     -- xmm2 is a function parameter as well and set to zero
+    // 48 8d 55 40                              --  lea rdx,[rbp+40]
+    // 48 8d 4d 80                              --  lea rcx,[rbp-80]
+    // ff 15 02000000 eb 08 new_call_address    --  call NormalizeVector(...)
+    // f3 0f 11 75 44                           --  movss [rbp+44],xmm6
+    // 0f 28 10                                 --  xmm2,[rax]
+    vanilla = "48 8d 55 40 48 8d 4d 80 e8 e2 38 a8 ff 0f 28 10";
     assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    
+    if (assembly_location != 0) {
+        // https://stackoverflow.com/questions/40936534/how-to-alloc-a-executable-memory-buffer
+        MODULEINFO module_info;
+        GetModuleInformation(GetCurrentProcess(), GetModuleHandleA("eldenring.exe"), &module_info, sizeof(module_info));
+        LPVOID eldenring_assembly_base = module_info.lpBaseOfDll;
+        
+        int memory_block_size_in_bytes = 64;
+        SYSTEM_INFO system_info;
+        GetSystemInfo(&system_info);
+        auto const page_size = system_info.dwPageSize;
+    
+        // prepare the memory in which the machine code will be put (it's not executable yet):
+        auto const buffer = VirtualAlloc(nullptr, page_size, MEM_COMMIT, PAGE_READWRITE);
+        auto const new_assembly_location = reinterpret_cast<std::uintptr_t>(buffer);
+        Hook(assembly_location, new_assembly_location, 2);
+
+        vanilla = "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00";
+        std::string new_call_address = Add_Spaces_To_HexString(Swap_HexString_Endian(NumberToHexString((ULONGLONG)eldenring_assembly_base + 0x18bf90)));
+        modded = "f3 0f 10 75 44 f3 0f 11 55 44 48 8d 55 40 48 8d 4d 80 ff 15 02 00 00 00 eb 08 " + new_call_address + " f3 0f 11 75 44 0f 28 10";
+        ReplaceExpectedBytesAtAddress((uintptr_t)buffer, vanilla, modded);
+        Hook(new_assembly_location + (modded.size() + 1)/3, assembly_location + 16);
+
+        // mark the memory as executable:
+        DWORD dummy;
+        VirtualProtect(buffer, memory_block_size_in_bytes, PAGE_EXECUTE_READ, &dummy);
+    }
     
     Log_Separator();
     Log_Separator();
@@ -150,13 +213,13 @@ void Apply_CameraHeightMod() {
     // f3 0f10 40 0c    --  movss xmm0,[rax+0C]
     //
     // modded:
-    // increase it to a constant of 2f (0x40000000);
-    // b8 00000040      --  mov eax,40000000
+    // set it to camera_height; it is not ideal to do it here since it is read here
+    // but not set; I have not found the assembly location where it is set;
+    // b8 xx xx xx xx   --  mov eax,camera_height
     // 66 0f6e c0       --  movd xmm0,eax
     // 90 90 90 90      --  4x nop
-    // 0 100 0000 0
     std::string vanilla = "48 8b 01 48 85 c0 74 06 f3 0f 10 40 0c";
-    std::string modded = "b8 00 00 00 40 66 0f 6e c0 90 90 90 90";
+    std::string modded = "b8 " + Get_HexString(camera_height) + " 66 0f 6e c0 90 90 90 90";
     uintptr_t assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
@@ -295,7 +358,7 @@ void Apply_LockOnScoreMod() {
     // has less effect and the angle has more on the final score;
     // 48 c7 83 4c 29 00 00 xx xx xx xx     --  mov [rbx+294c],angle_to_camera_score_multiplier
     vanilla = "48 c7 83 4c 29 00 00 00 00 f0 41";
-    modded = "48 c7 83 4c 29 00 00 " + Get_AngleToCameraScoreMultiplier_String();
+    modded = "48 c7 83 4c 29 00 00 " + Get_HexString(angle_to_camera_score_multiplier);
     assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
@@ -464,8 +527,8 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     Log_Separator();
     ReadAndLog_Config();
 
-    Apply_AngleToCameraMod();
-    // Apply_CameraHeightMod();
+    if (only_use_camera_yaw_for_switching_lock_on_targets) Apply_AngleToCameraMod();
+    if (camera_height != 1.45F) Apply_CameraHeightMod();
     Apply_FreeLockOnCameraMod();
     Apply_KeepLockOnMod();
     

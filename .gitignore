@@ -1,8 +1,8 @@
 .vscode
 
-mod/*
-!mod/FreeLockOnCamera
-mod/FreeLockOnCamera/log.txt
+config/*
+!config/config.ini
 
+mod
 SourceCode/x64
 thumbnail.png
