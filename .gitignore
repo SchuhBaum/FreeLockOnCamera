@@ -1,4 +1,8 @@
 .vscode
+
+mod/*
+!mod/FreeLockOnCamera
+mod/FreeLockOnCamera/log.txt
+
 SourceCode/x64
-FreeLockOnCamera
 thumbnail.png

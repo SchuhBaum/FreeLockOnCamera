@@ -1,20 +1,66 @@
-#include <Windows.h>
+#include "custom.h"
+#include "include/ini.h"
+#include "include/ModUtils.h"
 
-#include "ModUtils.h"
-#include "ini.h"
-
+using namespace custom;
 using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.0.5";
+const std::string version = "0.0.6";
 
-void LogSeparator() {
-    Log("----------");
+//
+// config
+//
+
+float angle_to_camera_score_multiplier = 6000;
+std::string Get_AngleToCameraScoreMultiplier_String() {
+    return Add_Spaces_In_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(angle_to_camera_score_multiplier)));
 }
 
-void ApplyAngleToCameraMod() {
-    Log("ApplyAngleToCameraMod");
+//
+//
+//
+
+void Log_Separator() {
+    Log("---------- ---------- ---------- ----------");
+}
+
+void Log_Parameters() {
+    Log("angle_to_camera_score_multiplier");
+    Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_AngleToCameraScoreMultiplier_String());
+    
+    Log_Separator();
+    Log_Separator();
+}
+    
+void ReadAndLog_Config() {
+    Log("ReadAndLog_Config");
+    Log_Separator();
+	INIFile config(GetModFolderPath() + "\\config.ini");
+	INIStructure ini;
+
+    try {
+        if (!config.read(ini)) {
+            ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
+            config.write(ini, true);
+            Log_Parameters();
+            return;
+        }
+        
+        angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
+        Log_Parameters();
+        return;
+    } catch(const std::exception& exception) {
+        Log("Could not read config from file. Use defaults.");
+        Log_Parameters();
+        return;
+    }
+}
+
+void Apply_AngleToCameraMod() {
+    Log("Apply_AngleToCameraMod");
+    Log_Separator();
     
     // vanilla:
     // uses the normalized camera rotation to determine cos(angle_to_camera);
@@ -29,12 +75,12 @@ void ApplyAngleToCameraMod() {
     // 0f 28 40 30      --  movaps xmm0,[rax+10] 
     // 0f 28 48 40      --  movaps xmm1,[rax+40]
     // 0f 29 45 d0      --  movaps [rbp-30],xmm0
-    std::vector<uint16_t> vanilla = { 0x0f, 0x28, 0x40, 0x30, 0x0f, 0x28, 0x48, 0x40, 0x0f, 0x29, 0x45, 0xd0 };
-    std::vector<uint8_t> modded = { 0x0f, 0x28, 0x40, 0x10, 0x0f, 0x28, 0x48, 0x40, 0x0f, 0x29, 0x45, 0xd0 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "0f 28 40 30 0f 28 48 40 0f 29 45 d0";
+    std::string modded = "0f 28 40 10 0f 28 48 40 0f 29 45 d0";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
     // vanilla:
     // this is part of the dot product calculation; cos(angle_to_camera) = dot(v_1, v_2) 
@@ -63,12 +109,12 @@ void ApplyAngleToCameraMod() {
     // 0f c6 d2 aa      --  shufps xmm2,xmm2,-56
     // f3 0f 59 55 d0   --  mulss xmm2,[rbp-30]      --  z_new = x;
     // f3 0f 58 f2      --  addss xmm6,xmm2
-    vanilla = { 0x0f, 0x28, 0xf2, 0xf3, 0x0f, 0x59, 0x75, 0xd0, 0x0f, 0x28, 0xca, 0x0f, 0xc6, 0xca, 0x55, 0xf3, 0x0f, 0x59, 0x4d, 0xd4, 0xf3, 0x0f, 0x58, 0xf1, 0x0f, 0xc6, 0xd2, 0xaa, 0xf3, 0x0f, 0x59, 0x55, 0xd8, 0xf3, 0x0f, 0x58, 0xf2 };
-    modded = { 0x0f, 0x28, 0xca, 0xf3, 0x0f, 0x59, 0x4d, 0xd8, 0x0f, 0x28, 0xf2, 0x0f, 0xc6, 0xf2, 0x55, 0xf3, 0x0f, 0x59, 0x75, 0xd4, 0xf3, 0x0f, 0x5c, 0xf1, 0x0f, 0xc6, 0xd2, 0xaa, 0xf3, 0x0f, 0x59, 0x55, 0xd0, 0xf3, 0x0f, 0x58, 0xf2 };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "0f 28 f2 f3 0f 59 75 d0 0f 28 ca 0f c6 ca 55 f3 0f 59 4d d4 f3 0f 58 f1 0f c6 d2 aa f3 0f 59 55 d8 f3 0f 58 f2";
+    modded = "0f 28 ca f3 0f 59 4d d8 0f 28 f2 0f c6 f2 55 f3 0f 59 75 d4 f3 0f 5c f1 0f c6 d2 aa f3 0f 59 55 d0 f3 0f 58 f2";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
     // vanilla:
     // uses the height difference from the candidate to the camera in angle_to_camera;
@@ -81,17 +127,18 @@ void ApplyAngleToCameraMod() {
     // might change simply by moving the camera up and down;
     // f3 44 0f 10 45 74        --  movss xmm8,[rbp+74]
     // f3 44 0f 11 45 44        --  movss [rbp+44],xmm8
-    vanilla = { 0xf3, 0x44, 0x0f, 0x5c, 0x45, 0x54, 0xf3, 0x44, 0x0f, 0x11, 0x45, 0x44 };
-    modded = { 0xf3, 0x44, 0x0f, 0x10, 0x45, 0x74, 0xf3, 0x44, 0x0f, 0x11, 0x45, 0x44 };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "f3 44 0f 5c 45 54 f3 44 0f 11 45 44";
+    modded = "f3 44 0f 10 45 74 f3 44 0f 11 45 44";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyCameraHeightMod() {
-    Log("ApplyCameraHeightMod");
+void Apply_CameraHeightMod() {
+    Log("Apply_CameraHeightMod");
+    Log_Separator();
     
     // vanilla:
     // the height of the camera aims at the center of the player; for aiming it makes 
@@ -108,17 +155,18 @@ void ApplyCameraHeightMod() {
     // 66 0f6e c0       --  movd xmm0,eax
     // 90 90 90 90      --  4x nop
     // 0 100 0000 0
-    std::vector<uint16_t> vanilla = { 0x48, 0x8b, 0x01, 0x48, 0x85, 0xc0, 0x74, 0x06, 0xf3, 0x0f, 0x10, 0x40, 0x0c };
-    std::vector<uint8_t> modded = { 0xb8, 0x00, 0x00, 0x00, 0x40, 0x66, 0x0f, 0x6e, 0xc0, 0x90, 0x90, 0x90, 0x90 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "48 8b 01 48 85 c0 74 06 f3 0f 10 40 0c";
+    std::string modded = "b8 00 00 00 40 66 0f 6e c0 90 90 90 90";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyFreeLockOnCameraMod() {
-    Log("ApplyFreeLockOnCameraMod");
+void Apply_FreeLockOnCameraMod() {
+    Log("Apply_FreeLockOnCameraMod");
+    Log_Separator();
     
     // vanilla:
     // sets the variable that disables the free camera during lock-on to one;
@@ -126,17 +174,18 @@ void ApplyFreeLockOnCameraMod() {
     //
     // modded:
     // sets the same variable to zero instead;
-    std::vector<uint16_t> vanilla = { 0xc6, 0x81, 0x10, 0x03, 0x00, 0x00, 0x01 };
-    std::vector<uint8_t> modded = { 0xc6, 0x81, 0x10, 0x03, 0x00, 0x00, 0x00 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "c6 81 10 03 00 00 01";
+    std::string modded = "c6 81 10 03 00 00 00";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyKeepLockOnMod() {
-    Log("ApplyKeepLockOnMod");
+void Apply_KeepLockOnMod() {
+    Log("Apply_KeepLockOnMod");
+    Log_Separator();
     
     // vanilla:
     // removes the lock-on when you don't look at the target with the camera;
@@ -149,31 +198,32 @@ void ApplyKeepLockOnMod() {
     // 41 8b ff             --  mov edi,r15d        --  r15d holds the value one
     // 90                   --  nop
     // 41 0f2f c3           --  comiss xmm0,xmm11
-    std::vector<uint16_t> vanilla = { 0x40, 0x0f, 0xb6, 0xff, 0x41, 0x0f, 0x2f, 0xc3 };
-    std::vector<uint8_t> modded = { 0x41, 0x8b, 0xff, 0x90, 0x41, 0x0f, 0x2f, 0xc3 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "40 0f b6 ff 41 0f 2f c3";
+    std::string modded = "41 8b ff 90 41 0f 2f c3";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
-    vanilla = { 0x40, 0x0f, 0xb6, 0xff, 0x0f, 0x2f, 0xc8, 0x41, 0x0f, 0x43, 0xff };
-    modded = { 0x41, 0x8b, 0xff, 0x90, 0x0f, 0x2f, 0xc8, 0x41, 0x0f, 0x43, 0xff };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "40 0f b6 ff 0f 2f c8 41 0f 43 ff";
+    modded = "41 8b ff 90 0f 2f c8 41 0f 43 ff";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
-    vanilla = { 0x40, 0x0f, 0xb6, 0xff, 0x0f, 0x2f, 0xc8, 0x41, 0x0f, 0x47, 0xff };
-    modded = { 0x41, 0x8b, 0xff, 0x90, 0x0f, 0x2f, 0xc8, 0x41, 0x0f, 0x47, 0xff };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "40 0f b6 ff 0f 2f c8 41 0f 47 ff";
+    modded = "41 8b ff 90 0f 2f c8 41 0f 47 ff";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyLockOnCloseRangeMod() {
-    Log("ApplyLockOnCloseRangeMod");
+void Apply_LockOnCloseRangeMod() {
+    Log("Apply_LockOnCloseRangeMod");
+    Log_Separator();
     
     // vanilla:
     // this variable has to do with setting a range value; when you are in close range
@@ -185,17 +235,18 @@ void ApplyLockOnCloseRangeMod() {
     // set this range value to zero;
     // c7 86 30290000 00000000      --  mov [RSI + 0x2930],0
     // 90 90                        --  2x nop
-    std::vector<uint16_t> vanilla = { 0xf3, 0x0f, 0x58, 0xca, 0xf3, 0x0f, 0x11, 0x8e, 0x30, 0x29, 0x00, 0x00 };
-    std::vector<uint8_t> modded = { 0xc7, 0x86, 0x30, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x90, 0x90 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "f3 0f 58 ca f3 0f 11 8e 30 29 00 00";
+    std::string modded = "c7 86 30 29 00 00 00 00 00 00 90 90";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
    
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyLockOnHealthBarMod() {
-    Log("ApplyLockOnHealthBarMod");
+void Apply_LockOnHealthBarMod() {
+    Log("Apply_LockOnHealthBarMod");
+    Log_Separator();
     
     // vanilla:
     // shows health bars over the currently locked-on target;
@@ -206,17 +257,18 @@ void ApplyLockOnHealthBarMod() {
     // don't show it by skipping the if-block;
     // eb 18            --  jmp <+18>
     // 49 8b 5e 08      --  mov rbx,[r14+08]
-    std::vector<uint16_t> vanilla = { 0x75, 0x18, 0x49, 0x8b, 0x5e, 0x08 };
-    std::vector<uint8_t> modded = { 0xeb, 0x18, 0x49, 0x8b, 0x5e, 0x08 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "75 18 49 8b 5e 08";
+    std::string modded = "eb 18 49 8b 5e 08";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyLockOnScoreMod() {
-    Log("ApplyLogOnScoreMod");
+void Apply_LockOnScoreMod() {
+    Log("Apply_LogOnScoreMod");
+    Log_Separator();
     
     // vanilla:
     // uses angle_to_player for the score; this variable is saved at [rbx+64];
@@ -228,12 +280,12 @@ void ApplyLockOnScoreMod() {
     // and switch to candidates that you look at with the camera;
     // f3 0f 10 43 6c       --  movss xmm0,[rbx+6c]
     // f3 0f 10 4b 60       --  movss xmm1,[rbx+60]
-    std::vector<uint16_t> vanilla = { 0xf3, 0x0f, 0x10, 0x43, 0x64, 0xf3, 0x0f, 0x10, 0x4b, 0x60 };
-    std::vector<uint8_t> modded = { 0xf3, 0x0f, 0x10, 0x43, 0x6c, 0xf3, 0x0f, 0x10, 0x4b, 0x60 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "f3 0f 10 43 64 f3 0f 10 4b 60";
+    std::string modded = "f3 0f 10 43 6c f3 0f 10 4b 60";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
     // vanilla:
     // the score applies a multiplier on how well the player is facing the candidate;
@@ -241,18 +293,19 @@ void ApplyLockOnScoreMod() {
     //
     // increase the score multiplier for angle_to_player; this means that the range 
     // has less effect and the angle has more on the final score;
-    // 48 c7 83 4c 29 00 00 00 00 34 43     --  mov [rbx+294c],(float)180
-    vanilla = { 0x48, 0xc7, 0x83, 0x4c, 0x29, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x41 };
-    modded = { 0x48, 0xc7, 0x83, 0x4c, 0x29, 0x00, 0x00, 0x00, 0x00, 0x34, 0x43 };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    // 48 c7 83 4c 29 00 00 xx xx xx xx     --  mov [rbx+294c],angle_to_camera_score_multiplier
+    vanilla = "48 c7 83 4c 29 00 00 00 00 f0 41";
+    modded = "48 c7 83 4c 29 00 00 " + Get_AngleToCameraScoreMultiplier_String();
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyLockOnSensitivityMod() {
-    Log("ApplyLockOnSensitivityMod");
+void Apply_LockOnSensitivityMod() {
+    Log("Apply_LockOnSensitivityMod");
+    Log_Separator();
     
     // vanilla:
     // switching locked-on targets requires the mouse to be moved faster than a threshold speed;
@@ -264,17 +317,18 @@ void ApplyLockOnSensitivityMod() {
     // remove the jump when the threshold is not met; this is still bad since it 
     // reacts to moving the mouse rather than the exact camera position; too janky
     // for my taste;
-    std::vector<uint16_t> vanilla = { 0x72, 0x3a, 0x0f, 0x2f, 0x15, 0x9a, 0xbe, 0x2c, 0x02, 0x76, 0x31 };
-    std::vector<uint8_t> modded = { 0x72, 0x3a, 0x0f, 0x2f, 0x15, 0x9a, 0xbe, 0x2c, 0x02, 0x90, 0x90 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "72 3a 0f 2f 15 9a be 2c 02 76 31";
+    std::string modded = "72 3a 0f 2f 15 9a be 2c 02 90 90";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyLockOnToggleMod() {
-    Log("ApplyLockOnToggleMod");
+void Apply_LockOnToggleMod() {
+    Log("Apply_LockOnToggleMod");
+    Log_Separator();
     
     // vanilla:
     // you have to press the lock-on key every time you lose it; this is not great when
@@ -287,12 +341,12 @@ void ApplyLockOnToggleMod() {
     // since you have to remember if it is toggled on or off;
     // 90 90 90 90 90 90        --  6x nop
     // 8b 0d 7a 52 ea 03        --  mov ecx,<address_offset>
-    std::vector<uint16_t> vanilla = { 0x88, 0x86, 0x31, 0x28, 0x00, 0x00, 0x8b, 0x0d, 0x7a, 0x52, 0xea, 0x03  };
-    std::vector<uint8_t> modded = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x8b, 0x0d, 0x7a, 0x52, 0xea, 0x03  };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "88 86 31 28 00 00 8b 0d 7a 52 ea 03";
+    std::string modded = "90 90 90 90 90 90 8b 0d 7a 52 ea 03";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
     // vanilla:
     // you can only toggle the lock-on off when you currently are locked-on;
@@ -304,12 +358,12 @@ void ApplyLockOnToggleMod() {
     // instead check the toggle variable;
     // 80 b9 31 28 00 00 00     --  cmp byte ptr [rcx+00002831],00
     // 0f 94 c0                 --  sete al
-    vanilla = { 0x80, 0xb9, 0x30, 0x28, 0x00, 0x00, 0x00, 0x0f, 0x94, 0xc0 };
-    modded = { 0x80, 0xb9, 0x31, 0x28, 0x00, 0x00, 0x00, 0x0f, 0x94, 0xc0 };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "80 b9 30 28 00 00 00 0f 94 c0";
+    modded = "80 b9 31 28 00 00 00 0f 94 c0";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
+    Log_Separator();
 
     // vanilla:
     // you lose your toggle after performing a critical hit;
@@ -322,17 +376,18 @@ void ApplyLockOnToggleMod() {
     // e8 59 e8 91 ff           --  call <+ff91e859>
     // 84 c0                    --  test al,al
     // eb 41                    --  jmp <+41>
-    vanilla = { 0xe8, 0x59, 0xe8, 0x91, 0xff, 0x84, 0xc0, 0x74, 0x41 };
-    modded = { 0xe8, 0x59, 0xe8, 0x91, 0xff, 0x84, 0xc0, 0xeb, 0x41 };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "e8 59 e8 91 ff 84 c0 74 41";
+    modded = "e8 59 e8 91 ff 84 c0 eb 41";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplyReduceLockOnAngleMod() {
-    Log("ApplyReduceLockOnAngleMod");
+void Apply_ReduceLockOnAngleMod() {
+    Log("Apply_ReduceLockOnAngleMod");
+    Log_Separator();
     
     // vanilla:
     // initializes the lock-on angle to 0.7f (around 40? degrees); this makes many 
@@ -344,17 +399,18 @@ void ApplyReduceLockOnAngleMod() {
     // change this value to 0.25f (around 15? degrees) instead; this affects auto 
     // switching targets when they die; you lose lock-on more often;
     // 0.25f = (0)(011 1110 1)(000 0..) = 3e 80 00 00
-    std::vector<uint16_t> vanilla = { 0xc7, 0x83, 0x2c, 0x29, 0x00, 0x00, 0xc2, 0xb8, 0x32, 0x3f };
-    std::vector<uint8_t> modded = { 0xc7, 0x83, 0x2c, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3e };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "c7 83 2c 29 00 00 c2 b8 32 3f";
+    std::string modded = "c7 83 2c 29 00 00 00 00 00 3e";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
 
-void ApplySwitchLockOnMod() {
-    Log("ApplySwitchLockOnMod");
+void Apply_SwitchLockOnMod() {
+    Log("Apply_SwitchLockOnMod");
+    Log_Separator();
     
     // vanilla:
     // this function switches locked-on targets; it is called when you move the mouse;
@@ -366,12 +422,12 @@ void ApplySwitchLockOnMod() {
     // modded:
     // focus on the same locked-on target => skip this function by returning 
     // immediately;
-    std::vector<uint16_t> vanilla = { 0x48, 0x89, 0x5c, 0x24, 0x20, 0x55, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0x90 };
-    std::vector<uint8_t> modded = { 0xC3, 0x90, 0x90, 0x90, 0x90, 0x55, 0x56, 0x41, 0x57, 0x48, 0x8d, 0x6c, 0x24, 0x90 };
-    uintptr_t assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    std::string vanilla = "48 89 5c 24 20 55 56 41 57 48 8d 6c 24 90";
+    std::string modded = "c3 90 90 90 90 55 56 41 57 48 8d 6c 24 90";
+    uintptr_t assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
-    LogSeparator();
+    Log_Separator();
 
     // vanilla:
     // the score is only used when initiating the lock-on; after that separate switch
@@ -387,34 +443,40 @@ void ApplySwitchLockOnMod() {
     // a8 20                --  test al,20
     // EB 10                --  jmp <+10>
     // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
-    vanilla = { 0xa8, 0x20, 0x74, 0x10, 0x80, 0xbe };
-    modded = { 0xa8, 0x20, 0xeb, 0x10, 0x80, 0xbe };
-    assembly_location = SigScan(vanilla);
-    if (assembly_location != 0) Replace(assembly_location, vanilla, modded);
+    vanilla = "a8 20 74 10 80 be";
+    modded = "a8 20 eb 10 80 be";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    LogSeparator();
-    LogSeparator();
+    Log_Separator();
+    Log_Separator();
 }
+
+//
+// main
+//
 
 DWORD WINAPI MainThread(LPVOID lpParam) {
     Log("author " + author);
     Log("version " + version);
-    LogSeparator();
-    LogSeparator();
+    
+    Log_Separator();
+    Log_Separator();
+    ReadAndLog_Config();
 
-    ApplyAngleToCameraMod();
-    // ApplyCameraHeightMod();
-    ApplyFreeLockOnCameraMod();
-    ApplyKeepLockOnMod();
+    Apply_AngleToCameraMod();
+    // Apply_CameraHeightMod();
+    Apply_FreeLockOnCameraMod();
+    Apply_KeepLockOnMod();
     
-    // ApplyLockOnCloseRangeMod();
-    ApplyLockOnHealthBarMod();
-    ApplyLockOnScoreMod(); // makes LockOnCloseRangeMod useless;
-    // ApplyLockOnSensitivityMod();
+    // Apply_LockOnCloseRangeMod();
+    Apply_LockOnHealthBarMod();
+    Apply_LockOnScoreMod(); // makes LockOnCloseRangeMod useless;
+    // Apply_LockOnSensitivityMod();
     
-    ApplyLockOnToggleMod();
-    // ApplyReduceLockOnAngleMod();
-    ApplySwitchLockOnMod(); // makes LockOnSensitivityMod useless;
+    Apply_LockOnToggleMod();
+    // Apply_ReduceLockOnAngleMod();
+    Apply_SwitchLockOnMod(); // makes LockOnSensitivityMod useless;
     
     CloseLog();
     return 0;
