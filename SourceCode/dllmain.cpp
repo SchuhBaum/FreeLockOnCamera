@@ -14,7 +14,7 @@ const std::string version = "0.0.7";
 // config
 //
 
-bool only_use_camera_yaw_for_switching_lock_on_targets = true;
+bool is_only_using_camera_yaw_for_switching_lock_on_targets = true;
 
 float angle_to_camera_score_multiplier = 6000.0F;
 float camera_height = 1.45F;
@@ -36,7 +36,7 @@ void Log_Parameters() {
     Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_HexString(angle_to_camera_score_multiplier));
     Log("camera_height");
     Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
-    Log("only_use_camera_yaw_for_switching_lock_on_targets: ", only_use_camera_yaw_for_switching_lock_on_targets ? "true" : "false");
+    Log("is_only_using_camera_yaw_for_switching_lock_on_targets: ", is_only_using_camera_yaw_for_switching_lock_on_targets ? "true" : "false");
 
     Log_Separator();
     Log_Separator();
@@ -52,7 +52,7 @@ void ReadAndLog_Config() {
         if (!config.read(ini)) {
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
-            ini["FreeLockOnCamera"]["only_use_camera_yaw_for_switching_lock_on_targets"] = std::to_string(only_use_camera_yaw_for_switching_lock_on_targets);
+            ini["FreeLockOnCamera"]["is_only_using_camera_yaw_for_switching_lock_on_targets"] = std::to_string(is_only_using_camera_yaw_for_switching_lock_on_targets);
             config.write(ini, true);
             Log_Parameters();
             return;
@@ -60,8 +60,8 @@ void ReadAndLog_Config() {
         
         angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
         camera_height = stof(ini["FreeLockOnCamera"]["camera_height"]);
-        std::string str = ini["FreeLockOnCamera"]["only_use_camera_yaw_for_switching_lock_on_targets"];
-        std::istringstream(str) >> std::boolalpha >> only_use_camera_yaw_for_switching_lock_on_targets;
+        std::string str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw_for_switching_lock_on_targets"];
+        std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw_for_switching_lock_on_targets;
         Log_Parameters();
         return;
     } catch(const std::exception& exception) {
@@ -527,7 +527,7 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     Log_Separator();
     ReadAndLog_Config();
 
-    if (only_use_camera_yaw_for_switching_lock_on_targets) Apply_AngleToCameraMod();
+    if (is_only_using_camera_yaw_for_switching_lock_on_targets) Apply_AngleToCameraMod();
     if (camera_height != 1.45F) Apply_CameraHeightMod();
     Apply_FreeLockOnCameraMod();
     Apply_KeepLockOnMod();
