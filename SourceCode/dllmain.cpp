@@ -1,4 +1,7 @@
+#pragma once
+
 #include "custom.h"
+#include "include/CameraFix.cpp"
 #include "include/ini.h"
 #include "include/ModUtils.h"
 #include <sstream>
@@ -8,13 +11,15 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.0.7";
+const std::string version = "0.0.8";
 
 //
 // config
 //
 
-bool is_only_using_camera_yaw_for_switching_lock_on_targets = true;
+bool is_health_bar_hidden = true;
+bool is_only_using_camera_yaw = true;
+bool is_toggle = true;
 
 float angle_to_camera_score_multiplier = 6000.0F;
 float camera_height = 1.45F;
@@ -27,16 +32,15 @@ std::string Get_HexString(float f) {
 //
 //
 
-void Log_Separator() {
-    Log("---------- ---------- ---------- ----------");
-}
-
 void Log_Parameters() {
     Log("angle_to_camera_score_multiplier");
     Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_HexString(angle_to_camera_score_multiplier));
     Log("camera_height");
     Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
-    Log("is_only_using_camera_yaw_for_switching_lock_on_targets: ", is_only_using_camera_yaw_for_switching_lock_on_targets ? "true" : "false");
+    
+    Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
+    Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
+    Log("is_toggle: ", is_toggle ? "true" : "false");
 
     Log_Separator();
     Log_Separator();
@@ -50,9 +54,14 @@ void ReadAndLog_Config() {
 
     try {
         if (!config.read(ini)) {
+            Log("The config file was not found. Create a new one.");
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
-            ini["FreeLockOnCamera"]["is_only_using_camera_yaw_for_switching_lock_on_targets"] = std::to_string(is_only_using_camera_yaw_for_switching_lock_on_targets);
+            
+            ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
+            ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
+            ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
+            
             config.write(ini, true);
             Log_Parameters();
             return;
@@ -60,12 +69,19 @@ void ReadAndLog_Config() {
         
         angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
         camera_height = stof(ini["FreeLockOnCamera"]["camera_height"]);
-        std::string str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw_for_switching_lock_on_targets"];
-        std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw_for_switching_lock_on_targets;
+        std::string str;
+        
+        str = ini["FreeLockOnCamera"]["is_health_bar_hidden"];
+        std::istringstream(str) >> std::boolalpha >> is_health_bar_hidden;
+        str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw"];
+        std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw;
+        
+        str = ini["FreeLockOnCamera"]["is_toggle"];
+        std::istringstream(str) >> std::boolalpha >> is_toggle;
         Log_Parameters();
         return;
     } catch(const std::exception& exception) {
-        Log("Could not read config from file. Use defaults.");
+        Log("Could not read or create the config file. Use defaults.");
         Log_Parameters();
         return;
     }
@@ -74,6 +90,10 @@ void ReadAndLog_Config() {
 void Apply_AngleToCameraMod() {
     Log("Apply_AngleToCameraMod");
     Log_Separator();
+    
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
     
     // vanilla:
     // uses the normalized camera rotation to determine cos(angle_to_camera);
@@ -85,13 +105,15 @@ void Apply_AngleToCameraMod() {
     // use a normalized variable that ignores the height (y = 0); however this variable 
     // is rotated; (x, z) = (0, 1) means west instead of north; cos(angle_to_camera) = 
     // dot_product => the dot product needs to use (-z, x) instead of (x, z) later;
-    // 0f 28 40 30      --  movaps xmm0,[rax+10] 
+    // 0f 28 40 10      --  movaps xmm0,[rax+10] 
     // 0f 28 48 40      --  movaps xmm1,[rax+40]
     // 0f 29 45 d0      --  movaps [rbp-30],xmm0
-    std::string vanilla = "0f 28 40 30 0f 28 48 40 0f 29 45 d0";
-    std::string modded = "0f 28 40 10 0f 28 48 40 0f 29 45 d0";
-    uintptr_t assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    
+    // it can be a bit time consuming to do it like this; it is more general; I think
+    // I will wait and see how much patches can mess these up;
+    vanilla = "0f 28 ? 30 0f 28 ? 40 0f 29 ? d0";
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location + 3, "30", "10");
     
     Log_Separator();
 
@@ -182,7 +204,9 @@ void Apply_AngleToCameraMod() {
         // prepare the memory in which the machine code will be put (it's not executable yet):
         auto const buffer = VirtualAlloc(nullptr, page_size, MEM_COMMIT, PAGE_READWRITE);
         auto const new_assembly_location = reinterpret_cast<std::uintptr_t>(buffer);
-        Hook(assembly_location, new_assembly_location, 2);
+        
+        // removes 14 + 2 bytes from assembly_location => jump-back-address is assembly_location + 16;
+        Hook(assembly_location, new_assembly_location, 2); 
 
         vanilla = "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00";
         std::string new_call_address = Add_Spaces_To_HexString(Swap_HexString_Endian(NumberToHexString((ULONGLONG)eldenring_assembly_base + 0x18bf90)));
@@ -527,20 +551,24 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     Log_Separator();
     ReadAndLog_Config();
 
-    if (is_only_using_camera_yaw_for_switching_lock_on_targets) Apply_AngleToCameraMod();
+    if (is_only_using_camera_yaw) Apply_AngleToCameraMod();
     if (camera_height != 1.45F) Apply_CameraHeightMod();
     Apply_FreeLockOnCameraMod();
     Apply_KeepLockOnMod();
     
     // Apply_LockOnCloseRangeMod();
-    Apply_LockOnHealthBarMod();
+    if (is_health_bar_hidden) Apply_LockOnHealthBarMod();
     Apply_LockOnScoreMod(); // makes LockOnCloseRangeMod useless;
     // Apply_LockOnSensitivityMod();
     
-    Apply_LockOnToggleMod();
+    if (is_toggle) Apply_LockOnToggleMod();
     // Apply_ReduceLockOnAngleMod();
     Apply_SwitchLockOnMod(); // makes LockOnSensitivityMod useless;
     
+    // this can fail when using the original CameraFix mod; in that case it can take 
+    // a while and the logs might misalign or get spammed otherwise;
+    if (is_toggle) CameraFix::Apply_CameraResetMod();
+
     CloseLog();
     return 0;
 }

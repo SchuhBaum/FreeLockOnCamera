@@ -152,6 +152,11 @@ namespace ModUtils
 		}
 	}
 
+    // modded;
+    static void Log_Separator() {
+        Log("---------- ---------- ---------- ----------");
+    }
+    
 	static void CloseLog()
 	{
 		if (muLogFile.is_open())
@@ -162,6 +167,7 @@ namespace ModUtils
 
 	static void ShowErrorPopup(std::string error)
 	{
+        return; //modded
 		GetCurrentModName();
 		Log("Error popup: ", error);
 		MessageBox(NULL, (LPCWSTR)error.c_str(), (LPCWSTR)GetCurrentModName().c_str(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
@@ -370,7 +376,9 @@ namespace ModUtils
 				&& state == MEM_COMMIT;
 			if (isMemoryReadable)
 			{
-				Log("Checking region: ", NumberToHexString(regionStart));
+                // modded;
+				// Log("Checking region: ", NumberToHexString(regionStart));
+                
 				currentAddress = regionStart;
 				while (currentAddress < regionEnd - aobTokens.size())
 				{
@@ -398,7 +406,8 @@ namespace ModUtils
 			}
 			else
 			{
-				Log("Skipped region: ", NumberToHexString(regionStart));
+                // modded;
+				// Log("Skipped region: ", NumberToHexString(regionStart));
 			}
 
 			numRegionsChecked++;

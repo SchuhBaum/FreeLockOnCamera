@@ -3,7 +3,7 @@
 
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <Version>0.0.7</Version>
+    <Version>0.0.8</Version>
     <RootNamespace>FreeLockOnCamera</RootNamespace>
   </PropertyGroup>
   
@@ -17,6 +17,9 @@
     <ClCompile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
+    <!-- <Link> -->
+      <!-- <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput> -->
+    <!-- </Link> -->
   </ItemDefinitionGroup>
   
   <ItemGroup Label="ProjectConfigurations">
