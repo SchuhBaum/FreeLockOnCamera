@@ -1,13 +1,13 @@
 ## FreeLockOnCamera
 ###### Version: 0.0.8
 
-This is a mod for Elden Ring.
+This is a mod for Elden Ring v1.10.
 
 ### Description
 The camera can be rotated freely during lock-on. Includes some additional changes like how lock-on targets are selected.
 
 See this youtube video for a demonstration:  
-https://www.youtube.com/watch?v=0-MaByXTaxw //TODO
+https://www.youtube.com/watch?v=-FiB5SYhJls
 
 ### Installation
 0. Download and install [Elden Mod Loader](https://www.nexusmods.com/eldenring/mods/117) and [Anti-Cheat Toggler](https://www.nexusmods.com/eldenring/mods/90/). Disable anti-cheat if not done already.
@@ -16,12 +16,11 @@ https://www.youtube.com/watch?v=0-MaByXTaxw //TODO
 3. Start the game as normal. Make sure that the in-game option `Launch Setting` is set to `Play Offline`.  
 
 ### Bug reports
-I am still new to Elden Ring modding. If you find bugs or side effects let me know. Please describe step-by-step how to reproduce the issue.
-
-### Contact
-If you have feedback, you can message me on Discord `@schuhbaum` or write an email to SchuhBaum71@gmail.com.  
+I am still new to Elden Ring modding. If you find bugs or side effects let me know. Please describe step-by-step how to reproduce the issue. You can post them in the [Issues](https://github.com/SchuhBaum/FreeLockOnCamera/issues) tab.
 
 ### License  
 See the LICENSE-MIT.md file.
 
 ### Changelog
+v0.0.8:
+- Initial release.

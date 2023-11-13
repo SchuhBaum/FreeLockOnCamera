@@ -167,10 +167,10 @@ namespace ModUtils
 
 	static void ShowErrorPopup(std::string error)
 	{
-        return; //modded
-		GetCurrentModName();
-		Log("Error popup: ", error);
-		MessageBox(NULL, (LPCWSTR)error.c_str(), (LPCWSTR)GetCurrentModName().c_str(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+        // modded;
+		Log("Error: ", error);
+		// GetCurrentModName();
+		// MessageBox(NULL, (LPCWSTR)error.c_str(), (LPCWSTR)GetCurrentModName().c_str(), MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 	}
 
 	static DWORD_PTR GetProcessBaseAddress(DWORD processId)
