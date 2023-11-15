@@ -1,8 +1,8 @@
 .vscode
 
-config/*
-!config/config.ini
+Config/*
+!Config/config.ini
 
-mod
+Mod
 SourceCode/x64
-thumbnail.png
+Thumbnail.png
