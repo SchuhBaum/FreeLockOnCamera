@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.0.8";
+const std::string version = "0.0.9";
 
 //
 // config
@@ -19,6 +19,7 @@ const std::string version = "0.0.8";
 
 bool is_health_bar_hidden = true;
 bool is_only_using_camera_yaw = true;
+bool is_target_switching_enabled = true;
 bool is_toggle = true;
 
 float angle_to_camera_score_multiplier = 6000.0F;
@@ -40,6 +41,7 @@ void Log_Parameters() {
     
     Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
+    Log("is_target_switching_enabled: ", is_target_switching_enabled ? "true" : "false");
     Log("is_toggle: ", is_toggle ? "true" : "false");
 
     Log_Separator();
@@ -60,6 +62,7 @@ void ReadAndLog_Config() {
             
             ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
             ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
+            ini["FreeLockOnCamera"]["is_target_switching_enabled"] = std::to_string(is_target_switching_enabled);
             ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
             
             config.write(ini, true);
@@ -78,8 +81,11 @@ void ReadAndLog_Config() {
         str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw"];
         std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw;
         
+        str = ini["FreeLockOnCamera"]["is_target_switching_enabled"];
+        std::istringstream(str) >> std::boolalpha >> is_target_switching_enabled;
         str = ini["FreeLockOnCamera"]["is_toggle"];
         std::istringstream(str) >> std::boolalpha >> is_toggle;
+        
         Log_Parameters();
         return;
     } catch(const std::exception& exception) {
@@ -516,26 +522,28 @@ void Apply_SwitchLockOnMod() {
     uintptr_t assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
-    Log_Separator();
-
-    // vanilla:
-    // the score is only used when initiating the lock-on; after that separate switch
-    // function(s) are used; every candidate becomes the lowest score after initiation;
-    // a8 20                --  test al,20
-    // 74 10                --  je <+10>
-    // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
-    //
-    // modded:
-    // skip this and leave everyone as a viable candidate; this means that this function
-    // now switches lock-on targets as well; the other switch function(s) seem to me more
-    // concerned with you moving the mouse rather than aiming directly;
-    // a8 20                --  test al,20
-    // EB 10                --  jmp <+10>
-    // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
-    vanilla = "a8 20 74 10 80 be";
-    modded = "a8 20 eb 10 80 be";
-    assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    if (is_target_switching_enabled) {
+        Log_Separator();
+        
+        // vanilla:
+        // the score is only used when initiating the lock-on; after that separate switch
+        // function(s) are used; every candidate becomes the lowest score after initiation;
+        // a8 20                --  test al,20
+        // 74 10                --  je <+10>
+        // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
+        //
+        // modded:
+        // skip this and leave everyone as a viable candidate; this means that this function
+        // now switches lock-on targets as well; the other switch function(s) seem to me more
+        // concerned with you moving the mouse rather than aiming directly;
+        // a8 20                --  test al,20
+        // EB 10                --  jmp <+10>
+        // 80 be 30280000 00    --  cmp byte ptr [rsi+00002830],00
+        vanilla = "a8 20 74 10 80 be";
+        modded = "a8 20 eb 10 80 be";
+        assembly_location = AobScan(vanilla);
+        if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    }
     
     Log_Separator();
     Log_Separator();
