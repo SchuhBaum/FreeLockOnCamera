@@ -362,7 +362,7 @@ void Apply_LockOnHealthBarMod() {
 }
 
 void Apply_LockOnScoreMod() {
-    Log("Apply_LogOnScoreMod");
+    Log("Apply_LockOnScoreMod");
     Log_Separator();
     
     // vanilla:
@@ -380,19 +380,21 @@ void Apply_LockOnScoreMod() {
     uintptr_t assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
-    Log_Separator();
+    if (angle_to_camera_score_multiplier != 30.0F) {
+        Log_Separator();
 
-    // vanilla:
-    // the score applies a multiplier on how well the player is facing the candidate;
-    // 48 c7 83 4c 29 00 00 00 00 f0 41     --  mov [rbx+294c],(float)30
-    //
-    // increase the score multiplier for angle_to_player; this means that the range 
-    // has less effect and the angle has more on the final score;
-    // 48 c7 83 4c 29 00 00 xx xx xx xx     --  mov [rbx+294c],angle_to_camera_score_multiplier
-    vanilla = "48 c7 83 4c 29 00 00 00 00 f0 41";
-    modded = "48 c7 83 4c 29 00 00 " + Get_HexString(angle_to_camera_score_multiplier);
-    assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+        // vanilla:
+        // the score applies a multiplier on how well the player is facing the candidate;
+        // 48 c7 83 4c 29 00 00 00 00 f0 41     --  mov [rbx+294c],(float)30
+        //
+        // increase the score multiplier for angle_to_player; this means that the range 
+        // has less effect and the angle has more on the final score;
+        // 48 c7 83 4c 29 00 00 xx xx xx xx     --  mov [rbx+294c],angle_to_camera_score_multiplier
+        vanilla = "48 c7 83 4c 29 00 00 00 00 f0 41";
+        modded = "48 c7 83 4c 29 00 00 " + Get_HexString(angle_to_camera_score_multiplier);
+        assembly_location = AobScan(vanilla);
+        if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    }
 
     Log_Separator();
     Log_Separator();
