@@ -3,12 +3,11 @@
 
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <Version>0.0.9</Version>
+    <Version>0.1.0</Version>
     <RootNamespace>FreeLockOnCamera</RootNamespace>
   </PropertyGroup>
   
   <ItemGroup>
-    <!-- <ClCompile Include="DllMain.cpp"/> -->
     <ClCompile Include="**/*.cpp"/>
     <!-- <Link Include="d3d11.lib;d3d12.lib;D3DCompiler.lib"/> -->
   </ItemGroup>

@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.0.9";
+const std::string version = "0.1.0";
 
 //
 // config
@@ -19,15 +19,15 @@ const std::string version = "0.0.9";
 
 bool is_health_bar_hidden = true;
 bool is_only_using_camera_yaw = true;
-bool is_target_switching_enabled = true;
 bool is_toggle = true;
 
 float angle_to_camera_score_multiplier = 6000.0F;
 float camera_height = 1.45F;
-
 std::string Get_HexString(float f) {
     return Add_Spaces_To_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(f)));
 }
+
+std::string target_switching_mode = "modded_switch";
 
 //
 //
@@ -41,9 +41,9 @@ void Log_Parameters() {
     
     Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
-    Log("is_target_switching_enabled: ", is_target_switching_enabled ? "true" : "false");
     Log("is_toggle: ", is_toggle ? "true" : "false");
 
+    Log("target_switching_mode: ", target_switching_mode);
     Log_Separator();
     Log_Separator();
 }
@@ -62,9 +62,9 @@ void ReadAndLog_Config() {
             
             ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
             ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
-            ini["FreeLockOnCamera"]["is_target_switching_enabled"] = std::to_string(is_target_switching_enabled);
             ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
             
+            ini["FreeLockOnCamera"]["target_switching_mode"] = target_switching_mode;
             config.write(ini, true);
             Log_Parameters();
             return;
@@ -74,17 +74,20 @@ void ReadAndLog_Config() {
         angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
         camera_height = stof(ini["FreeLockOnCamera"]["camera_height"]);
         if (camera_height > -0.01F && camera_height < 0.01F) camera_height = 0.01F;
-        std::string str;
         
+        std::string str;
         str = ini["FreeLockOnCamera"]["is_health_bar_hidden"];
         std::istringstream(str) >> std::boolalpha >> is_health_bar_hidden;
+        
         str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw"];
         std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw;
-        
-        str = ini["FreeLockOnCamera"]["is_target_switching_enabled"];
-        std::istringstream(str) >> std::boolalpha >> is_target_switching_enabled;
         str = ini["FreeLockOnCamera"]["is_toggle"];
         std::istringstream(str) >> std::boolalpha >> is_toggle;
+        
+        str = ini["FreeLockOnCamera"]["target_switching_mode"];
+        if (str == "vanilla_switch" || str == "modded_keep" || str == "modded_switch") {
+            std::istringstream(str) >> std::boolalpha >> target_switching_mode;
+        }
         
         Log_Parameters();
         return;
@@ -524,7 +527,7 @@ void Apply_SwitchLockOnMod() {
     uintptr_t assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
-    if (is_target_switching_enabled) {
+    if (target_switching_mode == "modded_switch") {
         Log_Separator();
         
         // vanilla:
@@ -575,7 +578,7 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     
     if (is_toggle) Apply_LockOnToggleMod();
     // Apply_ReduceLockOnAngleMod();
-    Apply_SwitchLockOnMod(); // makes LockOnSensitivityMod useless;
+    if (target_switching_mode != "vanilla_switch") Apply_SwitchLockOnMod(); // makes LockOnSensitivityMod useless;
     
     // this can fail when using the original CameraFix mod; in that case it can take 
     // a while and the logs might misalign or get spammed otherwise;
