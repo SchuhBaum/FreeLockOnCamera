@@ -86,7 +86,7 @@ void ReadAndLog_Config() {
         
         str = ini["FreeLockOnCamera"]["target_switching_mode"];
         if (str == "vanilla_switch" || str == "modded_keep" || str == "modded_switch") {
-            std::istringstream(str) >> std::boolalpha >> target_switching_mode;
+            target_switching_mode = str;
         }
         
         Log_Parameters();
