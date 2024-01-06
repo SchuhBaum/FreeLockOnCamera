@@ -11,13 +11,14 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.0";
+const std::string version = "0.1.1";
 
 //
 // config
 //
 
 bool is_health_bar_hidden = true;
+bool is_lock_on_camera_zoom_enabled = true;
 bool is_only_using_camera_yaw = true;
 bool is_toggle = true;
 
@@ -41,6 +42,7 @@ void Log_Parameters() {
     
     Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
+    Log("is_lock_on_camera_zoom_enabled: ", is_lock_on_camera_zoom_enabled ? "true" : "false");
     Log("is_toggle: ", is_toggle ? "true" : "false");
 
     Log("target_switching_mode: ", target_switching_mode);
@@ -61,6 +63,7 @@ void ReadAndLog_Config() {
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
             
             ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
+            ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"] = std::to_string(is_lock_on_camera_zoom_enabled);
             ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
             ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
             
@@ -78,6 +81,8 @@ void ReadAndLog_Config() {
         std::string str;
         str = ini["FreeLockOnCamera"]["is_health_bar_hidden"];
         std::istringstream(str) >> std::boolalpha >> is_health_bar_hidden;
+        str = ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"];
+        std::istringstream(str) >> std::boolalpha >> is_lock_on_camera_zoom_enabled;
         
         str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw"];
         std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw;
@@ -276,6 +281,25 @@ void Apply_FreeLockOnCameraMod() {
     std::string modded = "c6 81 10 03 00 00 00";
     uintptr_t assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    
+    if (is_lock_on_camera_zoom_enabled) {
+        Log_Separator();
+        
+        // vanilla:
+        // checks if the free lock-on camera is disabled; if yes then some camera paramters
+        // get changed;
+        // 38 93 10030000       --  cmp [rbx+00000310],dl   <-- dl is always zero(?)
+        // 74 26                --  je <+26>                <-- nop this
+        //
+        // modded:
+        // changing the lock-on variable at the beginning has some side effects; the camera
+        // zooms out a bit when locking on certain large enemies; this change here tries to
+        // enable it again;
+        vanilla = "38 93 10 03 00 00 74 26";
+        modded = "38 93 10 03 00 00 90 90";
+        assembly_location = AobScan(vanilla);
+        if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    }
     
     Log_Separator();
     Log_Separator();
