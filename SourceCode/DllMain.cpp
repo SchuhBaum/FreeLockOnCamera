@@ -17,6 +17,7 @@ const std::string version = "0.1.1";
 // config
 //
 
+bool lock_camera = false;
 bool is_health_bar_hidden = true;
 bool is_lock_on_camera_zoom_enabled = true;
 bool is_only_using_camera_yaw = true;
@@ -40,6 +41,7 @@ void Log_Parameters() {
     Log("camera_height");
     Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
     
+    Log("lock_camera: ", lock_camera ? "true" : "false");
     Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
     Log("is_lock_on_camera_zoom_enabled: ", is_lock_on_camera_zoom_enabled ? "true" : "false");
@@ -62,6 +64,7 @@ void ReadAndLog_Config() {
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
             
+            ini["FreeLockOnCamera"]["lock_camera"] = std::to_string(is_health_bar_hidden);
             ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
             ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"] = std::to_string(is_lock_on_camera_zoom_enabled);
             ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
@@ -79,6 +82,8 @@ void ReadAndLog_Config() {
         if (camera_height > -0.01F && camera_height < 0.01F) camera_height = 0.01F;
         
         std::string str;
+        str = ini["FreeLockOnCamera"]["lock_camera"];
+        std::istringstream(str) >> std::boolalpha >> lock_camera;
         str = ini["FreeLockOnCamera"]["is_health_bar_hidden"];
         std::istringstream(str) >> std::boolalpha >> is_health_bar_hidden;
         str = ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"];
@@ -269,18 +274,21 @@ void Apply_CameraHeightMod() {
 
 void Apply_FreeLockOnCameraMod() {
     Log("Apply_FreeLockOnCameraMod");
-    Log_Separator();
     
-    // vanilla:
-    // sets the variable that disables the free camera during lock-on to one;
-    // c6 81 10030000 01    --  mov byte ptr [rcx+00000310],01
-    //
-    // modded:
-    // sets the same variable to zero instead;
-    std::string vanilla = "c6 81 10 03 00 00 01";
-    std::string modded = "c6 81 10 03 00 00 00";
-    uintptr_t assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    if (!lock_camera) {
+        Log_Separator();
+    
+        // vanilla:
+        // sets the variable that disables the free camera during lock-on to one;
+        // c6 81 10030000 01    --  mov byte ptr [rcx+00000310],01
+        //
+        // modded:
+        // sets the same variable to zero instead;
+        std::string vanilla = "c6 81 10 03 00 00 01";
+        std::string modded = "c6 81 10 03 00 00 00";
+        uintptr_t assembly_location = AobScan(vanilla);
+        if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    }
     
     if (is_lock_on_camera_zoom_enabled) {
         Log_Separator();
@@ -295,9 +303,9 @@ void Apply_FreeLockOnCameraMod() {
         // changing the lock-on variable at the beginning has some side effects; the camera
         // zooms out a bit when locking on certain large enemies; this change here tries to
         // enable it again;
-        vanilla = "38 93 10 03 00 00 74 26";
-        modded = "38 93 10 03 00 00 90 90";
-        assembly_location = AobScan(vanilla);
+        std::string vanilla = "38 93 10 03 00 00 74 26";
+        std::string modded = "38 93 10 03 00 00 90 90";
+        uintptr_t assembly_location = AobScan(vanilla);
         if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     }
     
