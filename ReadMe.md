@@ -22,6 +22,9 @@ I am still new to Elden Ring modding. If you find bugs or side effects let me kn
 See the LICENSE-MIT.md file.
 
 ### Changelog
+v0.1.2:
+- Added parameter `lock_camera` to make free cam optional for players who want to keep the lock as is but change other parameters
+
 v0.1.1:
 - Fixed a bug where the camera would not zoom out when locking on certain large enemies. You can disable it in the file `config.ini` if you prefer no zoom.
 
