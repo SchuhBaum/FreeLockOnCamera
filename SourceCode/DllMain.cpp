@@ -11,15 +11,16 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.1";
+const std::string version = "0.1.2";
 
 //
 // config
 //
 
-bool lock_camera = false;
+bool is_free_lock_on_camera_enabled = true;
 bool is_health_bar_hidden = true;
 bool is_lock_on_camera_zoom_enabled = true;
+
 bool is_only_using_camera_yaw = true;
 bool is_toggle = true;
 
@@ -41,12 +42,12 @@ void Log_Parameters() {
     Log("camera_height");
     Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
     
-    Log("lock_camera: ", lock_camera ? "true" : "false");
-    Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
+    Log("is_free_lock_on_camera_enabled: ", is_free_lock_on_camera_enabled ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
     Log("is_lock_on_camera_zoom_enabled: ", is_lock_on_camera_zoom_enabled ? "true" : "false");
-    Log("is_toggle: ", is_toggle ? "true" : "false");
+    Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
 
+    Log("is_toggle: ", is_toggle ? "true" : "false");
     Log("target_switching_mode: ", target_switching_mode);
     Log_Separator();
     Log_Separator();
@@ -64,12 +65,12 @@ void ReadAndLog_Config() {
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
             
-            ini["FreeLockOnCamera"]["lock_camera"] = std::to_string(is_health_bar_hidden);
+            ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"] = std::to_string(is_free_lock_on_camera_enabled);
             ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
             ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"] = std::to_string(is_lock_on_camera_zoom_enabled);
             ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
-            ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
             
+            ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
             ini["FreeLockOnCamera"]["target_switching_mode"] = target_switching_mode;
             config.write(ini, true);
             Log_Parameters();
@@ -82,18 +83,18 @@ void ReadAndLog_Config() {
         if (camera_height > -0.01F && camera_height < 0.01F) camera_height = 0.01F;
         
         std::string str;
-        str = ini["FreeLockOnCamera"]["lock_camera"];
-        std::istringstream(str) >> std::boolalpha >> lock_camera;
+        str = ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"];
+        std::istringstream(str) >> std::boolalpha >> is_free_lock_on_camera_enabled;
         str = ini["FreeLockOnCamera"]["is_health_bar_hidden"];
         std::istringstream(str) >> std::boolalpha >> is_health_bar_hidden;
+        
         str = ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"];
         std::istringstream(str) >> std::boolalpha >> is_lock_on_camera_zoom_enabled;
-        
         str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw"];
         std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw;
+        
         str = ini["FreeLockOnCamera"]["is_toggle"];
         std::istringstream(str) >> std::boolalpha >> is_toggle;
-        
         str = ini["FreeLockOnCamera"]["target_switching_mode"];
         if (str == "vanilla_switch" || str == "modded_keep" || str == "modded_switch") {
             target_switching_mode = str;
@@ -248,6 +249,10 @@ void Apply_CameraHeightMod() {
     Log("Apply_CameraHeightMod");
     Log_Separator();
     
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
+    
     // vanilla:
     // the height of the camera aims at the center of the player; for aiming it makes 
     // more sense that the camera aims at the head of the character; the offset is
@@ -263,9 +268,9 @@ void Apply_CameraHeightMod() {
     // b8 xx xx xx xx   --  mov eax,camera_height
     // 66 0f6e c0       --  movd xmm0,eax
     // 90 90 90 90      --  4x nop
-    std::string vanilla = "48 8b 01 48 85 c0 74 06 f3 0f 10 40 0c";
-    std::string modded = "b8 " + Get_HexString(camera_height) + " 66 0f 6e c0 90 90 90 90";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "48 8b 01 48 85 c0 74 06 f3 0f 10 40 0c";
+    modded = "b8 " + Get_HexString(camera_height) + " 66 0f 6e c0 90 90 90 90";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
     Log_Separator();
@@ -273,9 +278,12 @@ void Apply_CameraHeightMod() {
 }
 
 void Apply_FreeLockOnCameraMod() {
-    Log("Apply_FreeLockOnCameraMod");
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
     
-    if (!lock_camera) {
+    if (is_free_lock_on_camera_enabled) {
+        Log("Apply_FreeLockOnCameraMod");
         Log_Separator();
     
         // vanilla:
@@ -284,38 +292,64 @@ void Apply_FreeLockOnCameraMod() {
         //
         // modded:
         // sets the same variable to zero instead;
-        std::string vanilla = "c6 81 10 03 00 00 01";
-        std::string modded = "c6 81 10 03 00 00 00";
-        uintptr_t assembly_location = AobScan(vanilla);
+        vanilla = "c6 81 10 03 00 00 01";
+        modded = "c6 81 10 03 00 00 00";
+        assembly_location = AobScan(vanilla);
         if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+        
+        if (is_lock_on_camera_zoom_enabled) {
+            Log_Separator();
+            
+            // vanilla:
+            // checks if the free lock-on camera is disabled; if yes then some camera paramters
+            // get changed;
+            // 38 93 10030000       --  cmp [rbx+00000310],dl   <-- dl is always zero(?)
+            // 74 26                --  je <+26>                <-- nop this
+            //
+            // modded:
+            // changing the lock-on variable at the beginning has some side effects; the camera
+            // zooms out a bit when locking on certain large enemies; this change here tries to
+            // enable it again;
+            vanilla = "38 93 10 03 00 00 74 26";
+            modded = "38 93 10 03 00 00 90 90";
+            assembly_location = AobScan(vanilla);
+            if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+        }
+        
+        Log_Separator();
+        Log_Separator();
+        return;
     }
     
-    if (is_lock_on_camera_zoom_enabled) {
+    if (!is_lock_on_camera_zoom_enabled) {
+        Log("Apply_FreeLockOnCameraMod");
         Log_Separator();
         
         // vanilla:
-        // checks if the free lock-on camera is disabled; if yes then some camera paramters
-        // get changed;
+        // same as before;
         // 38 93 10030000       --  cmp [rbx+00000310],dl   <-- dl is always zero(?)
-        // 74 26                --  je <+26>                <-- nop this
+        // 74 26                --  je <+26>                <-- change to jmp
         //
         // modded:
-        // changing the lock-on variable at the beginning has some side effects; the camera
-        // zooms out a bit when locking on certain large enemies; this change here tries to
-        // enable it again;
-        std::string vanilla = "38 93 10 03 00 00 74 26";
-        std::string modded = "38 93 10 03 00 00 90 90";
-        uintptr_t assembly_location = AobScan(vanilla);
+        // this time jump always to skip the zoom out; there still might be side effects;
+        // not sure what else is affected but skipping this;
+        vanilla = "38 93 10 03 00 00 74 26";
+        modded = "38 93 10 03 00 00 eb 26";
+        assembly_location = AobScan(vanilla);
         if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+        
+        Log_Separator();
+        Log_Separator();
     }
-    
-    Log_Separator();
-    Log_Separator();
 }
 
 void Apply_KeepLockOnMod() {
     Log("Apply_KeepLockOnMod");
     Log_Separator();
+    
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
     
     // vanilla:
     // removes the lock-on when you don't look at the target with the camera;
@@ -328,9 +362,9 @@ void Apply_KeepLockOnMod() {
     // 41 8b ff             --  mov edi,r15d        --  r15d holds the value one
     // 90                   --  nop
     // 41 0f2f c3           --  comiss xmm0,xmm11
-    std::string vanilla = "40 0f b6 ff 41 0f 2f c3";
-    std::string modded = "41 8b ff 90 41 0f 2f c3";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "40 0f b6 ff 41 0f 2f c3";
+    modded = "41 8b ff 90 41 0f 2f c3";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
     Log_Separator();
@@ -355,6 +389,10 @@ void Apply_LockOnCloseRangeMod() {
     Log("Apply_LockOnCloseRangeMod");
     Log_Separator();
     
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
+    
     // vanilla:
     // this variable has to do with setting a range value; when you are in close range
     // then the lock-on relies less on the camera direction;
@@ -365,9 +403,9 @@ void Apply_LockOnCloseRangeMod() {
     // set this range value to zero;
     // c7 86 30290000 00000000      --  mov [RSI + 0x2930],0
     // 90 90                        --  2x nop
-    std::string vanilla = "f3 0f 58 ca f3 0f 11 8e 30 29 00 00";
-    std::string modded = "c7 86 30 29 00 00 00 00 00 00 90 90";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "f3 0f 58 ca f3 0f 11 8e 30 29 00 00";
+    modded = "c7 86 30 29 00 00 00 00 00 00 90 90";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
    
     Log_Separator();
@@ -378,6 +416,10 @@ void Apply_LockOnHealthBarMod() {
     Log("Apply_LockOnHealthBarMod");
     Log_Separator();
     
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
+    
     // vanilla:
     // shows health bars over the currently locked-on target;
     // 75 18            --  jne <+18>
@@ -387,9 +429,9 @@ void Apply_LockOnHealthBarMod() {
     // don't show it by skipping the if-block;
     // eb 18            --  jmp <+18>
     // 49 8b 5e 08      --  mov rbx,[r14+08]
-    std::string vanilla = "75 18 49 8b 5e 08";
-    std::string modded = "eb 18 49 8b 5e 08";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "75 18 49 8b 5e 08";
+    modded = "eb 18 49 8b 5e 08";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
     Log_Separator();
@@ -399,6 +441,10 @@ void Apply_LockOnHealthBarMod() {
 void Apply_LockOnScoreMod() {
     Log("Apply_LockOnScoreMod");
     Log_Separator();
+    
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
     
     // vanilla:
     // uses angle_to_player for the score; this variable is saved at [rbx+64];
@@ -410,9 +456,9 @@ void Apply_LockOnScoreMod() {
     // and switch to candidates that you look at with the camera;
     // f3 0f 10 43 6c       --  movss xmm0,[rbx+6c]
     // f3 0f 10 4b 60       --  movss xmm1,[rbx+60]
-    std::string vanilla = "f3 0f 10 43 64 f3 0f 10 4b 60";
-    std::string modded = "f3 0f 10 43 6c f3 0f 10 4b 60";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "f3 0f 10 43 64 f3 0f 10 4b 60";
+    modded = "f3 0f 10 43 6c f3 0f 10 4b 60";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
     if (angle_to_camera_score_multiplier != 30.0F) {
@@ -439,6 +485,10 @@ void Apply_LockOnSensitivityMod() {
     Log("Apply_LockOnSensitivityMod");
     Log_Separator();
     
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
+    
     // vanilla:
     // switching locked-on targets requires the mouse to be moved faster than a threshold speed;
     // 72 3a                --  jb <current_address+3a>
@@ -449,9 +499,9 @@ void Apply_LockOnSensitivityMod() {
     // remove the jump when the threshold is not met; this is still bad since it 
     // reacts to moving the mouse rather than the exact camera position; too janky
     // for my taste;
-    std::string vanilla = "72 3a 0f 2f 15 9a be 2c 02 76 31";
-    std::string modded = "72 3a 0f 2f 15 9a be 2c 02 90 90";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "72 3a 0f 2f 15 9a be 2c 02 76 31";
+    modded = "72 3a 0f 2f 15 9a be 2c 02 90 90";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
     Log_Separator();
@@ -461,6 +511,10 @@ void Apply_LockOnSensitivityMod() {
 void Apply_LockOnToggleMod() {
     Log("Apply_LockOnToggleMod");
     Log_Separator();
+    
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
     
     // vanilla:
     // you have to press the lock-on key every time you lose it; this is not great when
@@ -473,9 +527,9 @@ void Apply_LockOnToggleMod() {
     // since you have to remember if it is toggled on or off;
     // 90 90 90 90 90 90        --  6x nop
     // 8b 0d 7a 52 ea 03        --  mov ecx,<address_offset>
-    std::string vanilla = "88 86 31 28 00 00 8b 0d 7a 52 ea 03";
-    std::string modded = "90 90 90 90 90 90 8b 0d 7a 52 ea 03";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "88 86 31 28 00 00 8b 0d 7a 52 ea 03";
+    modded = "90 90 90 90 90 90 8b 0d 7a 52 ea 03";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
     Log_Separator();
@@ -521,6 +575,10 @@ void Apply_ReduceLockOnAngleMod() {
     Log("Apply_ReduceLockOnAngleMod");
     Log_Separator();
     
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
+    
     // vanilla:
     // initializes the lock-on angle to 0.7f (around 40? degrees); this makes many 
     // enemies lock-on candidates; switching targets just requires moving the mouse
@@ -531,9 +589,9 @@ void Apply_ReduceLockOnAngleMod() {
     // change this value to 0.25f (around 15? degrees) instead; this affects auto 
     // switching targets when they die; you lose lock-on more often;
     // 0.25f = (0)(011 1110 1)(000 0..) = 3e 80 00 00
-    std::string vanilla = "c7 83 2c 29 00 00 c2 b8 32 3f";
-    std::string modded = "c7 83 2c 29 00 00 00 00 00 3e";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "c7 83 2c 29 00 00 c2 b8 32 3f";
+    modded = "c7 83 2c 29 00 00 00 00 00 3e";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
     Log_Separator();
@@ -543,6 +601,10 @@ void Apply_ReduceLockOnAngleMod() {
 void Apply_SwitchLockOnMod() {
     Log("Apply_SwitchLockOnMod");
     Log_Separator();
+    
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
     
     // vanilla:
     // this function switches locked-on targets; it is called when you move the mouse;
@@ -554,9 +616,9 @@ void Apply_SwitchLockOnMod() {
     // modded:
     // focus on the same locked-on target => skip this function by returning 
     // immediately;
-    std::string vanilla = "48 89 5c 24 20 55 56 41 57 48 8d 6c 24 90";
-    std::string modded = "c3 90 90 90 90 55 56 41 57 48 8d 6c 24 90";
-    uintptr_t assembly_location = AobScan(vanilla);
+    vanilla = "48 89 5c 24 20 55 56 41 57 48 8d 6c 24 90";
+    modded = "c3 90 90 90 90 55 56 41 57 48 8d 6c 24 90";
+    assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
     if (target_switching_mode == "modded_switch") {
