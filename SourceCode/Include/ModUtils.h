@@ -391,7 +391,10 @@ namespace ModUtils
 						} 
 						else if (*(unsigned char*)currentAddress != (unsigned char)std::stoul(aobTokens[i], nullptr, 16))
 						{
-							currentAddress++;
+                            // modded;
+                            // I need to check if the index is zero; otherwise it didn't find my array of bytes 
+                            // "48 89 5c 24 ..." in the memory bytes "48 89 5c 48 89 5c 24 ...";
+							if (i == 0) currentAddress++;
 							break;
 						}
 						else if (i == aobTokens.size() - 1)

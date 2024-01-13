@@ -1,5 +1,5 @@
 ## FreeLockOnCamera
-###### Version: 0.1.2
+###### Version: 0.1.3
 
 This is a mod for Elden Ring v1.10.
 
@@ -11,7 +11,7 @@ https://www.youtube.com/watch?v=-FiB5SYhJls
 
 ### Installation
 0. Download and install [Elden Mod Loader](https://www.nexusmods.com/eldenring/mods/117) and [Anti-Cheat Toggler](https://www.nexusmods.com/eldenring/mods/90/). Disable anti-cheat if not done already.
-1. Download the file `FreeLockOnCamera.zip` from [Releases](https://github.com/SchuhBaum/FreeLockOnCamera/releases/tag/v0.1.2).
+1. Download the file `FreeLockOnCamera.zip` from [Releases](https://github.com/SchuhBaum/FreeLockOnCamera/releases/tag/v0.1.3).
 2. Extract its content in the folder `[Steam]\SteamApps\common\ELDEN RING\Game\`.
 3. Start the game as normal. Make sure that the in-game option `Launch Setting` is set to `Play Offline`.  
 
@@ -22,6 +22,9 @@ I am still new to Elden Ring modding. If you find bugs or side effects let me kn
 See the LICENSE-MIT.md file.
 
 ### Changelog
+v0.1.3:
+- Fixed a bug where a array of bytes would not be found when a partial match is directly before a direct match. The function `Apply_SwitchLockOnMod()` failed after the latest patch because of this.
+
 v0.1.2:
 - (thanks to emrecankarabacak) Added the parameter `is_free_lock_on_camera_enabled` to make free cam optional for players who want to keep the lock as is but change other parameters.
 - Fixed a bug where the parameter `is_lock_on_camera_zoom_enabled` would not get applied correctly when free cam is disabled.

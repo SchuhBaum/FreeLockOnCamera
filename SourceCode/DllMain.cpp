@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.2";
+const std::string version = "0.1.3";
 
 //
 // config
@@ -332,7 +332,7 @@ void Apply_FreeLockOnCameraMod() {
         //
         // modded:
         // this time jump always to skip the zoom out; there still might be side effects;
-        // not sure what else is affected but skipping this;
+        // not sure what else is affected by skipping this;
         vanilla = "38 93 10 03 00 00 74 26";
         modded = "38 93 10 03 00 00 eb 26";
         assembly_location = AobScan(vanilla);
