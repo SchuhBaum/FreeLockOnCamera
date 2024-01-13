@@ -4,7 +4,8 @@
 This is a mod for Elden Ring v1.10.
 
 ### Description
-The camera can be rotated freely during lock-on. Includes some additional changes like how lock-on targets are selected.
+The camera can be rotated freely during lock-on. Includes some additional changes like how lock-on targets are selected.  
+In Elden Ring the lock-on camera can fail to keep large enemies or groups of enemies in sight. This mod is a workaround. It is not ideal and probably even worse when using controllers. But you have control at all times and can rotate the camera however you need.
 
 See this youtube video for a demonstration:  
 https://www.youtube.com/watch?v=-FiB5SYhJls
