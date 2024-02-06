@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.3";
+const std::string version = "0.1.4";
 
 //
 // config
@@ -24,11 +24,9 @@ bool is_lock_on_camera_zoom_enabled = true;
 bool is_only_using_camera_yaw = true;
 bool is_toggle = true;
 
+float angle_range = 0.7F;
 float angle_to_camera_score_multiplier = 6000.0F;
 float camera_height = 1.45F;
-std::string Get_HexString(float f) {
-    return Add_Spaces_To_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(f)));
-}
 
 std::string target_switching_mode = "modded_switch";
 
@@ -36,19 +34,29 @@ std::string target_switching_mode = "modded_switch";
 //
 //
 
+std::string Get_HexString(float f) {
+    // f = 0.0F produces an empty string; not sure why;
+    std::string hex_string = Add_Spaces_To_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(f)));
+    if (hex_string.empty()) return "00 00 00 00";
+    return hex_string;
+}
+
 void Log_Parameters() {
+    Log("angle_range");
+    Log("  float: ", angle_range, "  hex: ", Get_HexString(angle_range));
     Log("angle_to_camera_score_multiplier");
     Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_HexString(angle_to_camera_score_multiplier));
+    
     Log("camera_height");
     Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
-    
     Log("is_free_lock_on_camera_enabled: ", is_free_lock_on_camera_enabled ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
+    
     Log("is_lock_on_camera_zoom_enabled: ", is_lock_on_camera_zoom_enabled ? "true" : "false");
     Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
-
     Log("is_toggle: ", is_toggle ? "true" : "false");
     Log("target_switching_mode: ", target_switching_mode);
+    
     Log_Separator();
     Log_Separator();
 }
@@ -62,6 +70,7 @@ void ReadAndLog_Config() {
     try {
         if (!config.read(ini)) {
             Log("The config file was not found. Create a new one.");
+            ini["FreeLockOnCamera"]["angle_range"] = std::to_string(angle_range);
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
             
@@ -77,10 +86,9 @@ void ReadAndLog_Config() {
             return;
         }
         
-        // camera_height == 0 crashes the game;
+        angle_range = stof(ini["FreeLockOnCamera"]["angle_range"]);
         angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
         camera_height = stof(ini["FreeLockOnCamera"]["camera_height"]);
-        if (camera_height > -0.01F && camera_height < 0.01F) camera_height = 0.01F;
         
         std::string str;
         str = ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"];
@@ -107,6 +115,29 @@ void ReadAndLog_Config() {
         Log_Parameters();
         return;
     }
+}
+
+void Apply_AngleRangeMod() {
+    Log("Apply_AngleRangeMod");
+    Log_Separator();
+    
+    std::string vanilla;
+    std::string modded;
+    uintptr_t assembly_location;
+    
+    // vanilla:
+    // you switch or acquire targets that are within ~0.7f radians(?) (around 40 degrees)
+    // to where you aim at; maybe it's half of that (+- 20 degrees);
+    //
+    // modded:
+    // change this value to angle_range;
+    vanilla = "c7 83 2c 29 00 00 c2 b8 32 3f";
+    modded = "c7 83 2c 29 00 00 " + Get_HexString(angle_range);
+    assembly_location = AobScan(vanilla);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    
+    Log_Separator();
+    Log_Separator();
 }
 
 void Apply_AngleToCameraMod() {
@@ -381,6 +412,26 @@ void Apply_KeepLockOnMod() {
     assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
+    // // this seems to have the same effect as the difference already in place (see above),
+    // // i.e. any new target needs to be within a certain range to where you aim at; you can
+    // // change how much using the function Apply_AngleRangeMod();
+    // //
+    // // vanilla:
+    // // excludes candidates that you don't look at; the same goes for the current locked-on
+    // // target; in that case it waits for a short duration before it removes the lock-on;
+    // // f3 0f 10 44 24 34            --  movss xmm0,[rsp+34]         <-- time difference
+    // // f3 0f 58 86 78 29 00 00      --  addss xmm0,[rsi+00002978]   <-- current timer
+    // //
+    // // modded:
+    // // keep the first part but don't remove the lock-on, i.e. keep the timer at zero;
+    // // f3 0f 10 44 24 34            --  movss xmm0,[rsp+34]     <-- ignored
+    // // 0f 57 c0                     --  xorps xmm0,xmm0         <-- set xmm0 to zero
+    // // 90 90 90 90 90               --  5x nop
+    // vanilla = "f3 0f 10 44 24 34 f3 0f 58 86 78 29 00 00";
+    // modded = "f3 0f 10 44 24 34 0f 57 c0 90 90 90 90 90";
+    // assembly_location = AobScan(vanilla);
+    // if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+
     Log_Separator();
     Log_Separator();
 }
@@ -571,33 +622,6 @@ void Apply_LockOnToggleMod() {
     Log_Separator();
 }
 
-void Apply_ReduceLockOnAngleMod() {
-    Log("Apply_ReduceLockOnAngleMod");
-    Log_Separator();
-    
-    std::string vanilla;
-    std::string modded;
-    uintptr_t assembly_location;
-    
-    // vanilla:
-    // initializes the lock-on angle to 0.7f (around 40? degrees); this makes many 
-    // enemies lock-on candidates; switching targets just requires moving the mouse
-    // rather than aiming at them; this can make things janky and you might switch
-    // unintentionally;
-    //
-    // modded:
-    // change this value to 0.25f (around 15? degrees) instead; this affects auto 
-    // switching targets when they die; you lose lock-on more often;
-    // 0.25f = (0)(011 1110 1)(000 0..) = 3e 80 00 00
-    vanilla = "c7 83 2c 29 00 00 c2 b8 32 3f";
-    modded = "c7 83 2c 29 00 00 00 00 00 3e";
-    assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
-    
-    Log_Separator();
-    Log_Separator();
-}
-
 void Apply_SwitchLockOnMod() {
     Log("Apply_SwitchLockOnMod");
     Log_Separator();
@@ -660,18 +684,18 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     Log_Separator();
     ReadAndLog_Config();
 
+    if (angle_range != 0.7F) Apply_AngleRangeMod();
     if (is_only_using_camera_yaw) Apply_AngleToCameraMod();
     if (camera_height != 1.45F) Apply_CameraHeightMod();
     Apply_FreeLockOnCameraMod();
-    Apply_KeepLockOnMod();
     
+    Apply_KeepLockOnMod();
     // Apply_LockOnCloseRangeMod();
     if (is_health_bar_hidden) Apply_LockOnHealthBarMod();
     Apply_LockOnScoreMod(); // makes LockOnCloseRangeMod useless;
-    // Apply_LockOnSensitivityMod();
     
+    // Apply_LockOnSensitivityMod();
     if (is_toggle) Apply_LockOnToggleMod();
-    // Apply_ReduceLockOnAngleMod();
     if (target_switching_mode != "vanilla_switch") Apply_SwitchLockOnMod(); // makes LockOnSensitivityMod useless;
     
     // this can fail when using the original CameraFix mod; in that case it can take 
