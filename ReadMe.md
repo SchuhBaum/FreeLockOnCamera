@@ -1,5 +1,5 @@
 ## FreeLockOnCamera
-###### Version: 0.1.4
+###### Version: 0.1.5
 
 This is a mod for Elden Ring v1.10.
 
@@ -12,7 +12,7 @@ https://www.youtube.com/watch?v=-FiB5SYhJls
 
 ### Installation
 0. Download and install [Elden Mod Loader](https://www.nexusmods.com/eldenring/mods/117) and [Anti-Cheat Toggler](https://www.nexusmods.com/eldenring/mods/90/). Disable anti-cheat if not done already.
-1. Download the file `FreeLockOnCamera.zip` from [Releases](https://github.com/SchuhBaum/FreeLockOnCamera/releases/tag/v0.1.4).
+1. Download the file `FreeLockOnCamera.zip` from [Releases](https://github.com/SchuhBaum/FreeLockOnCamera/releases/tag/v0.1.5).
 2. Extract its content in the folder `[Steam]\SteamApps\common\ELDEN RING\Game\`.
 3. Start the game as normal. Make sure that the in-game option `Launch Setting` is set to `Play Offline`.  
 
@@ -23,6 +23,9 @@ I am still new to Elden Ring modding. If you find bugs or side effects let me kn
 See the LICENSE-MIT.md file.
 
 ### Changelog
+v0.1.5:
+- Added a delay that is necessary when using the mod via ModEngine2. Otherwise the first change is not applied, i.e. it reaches the end of scannable memory.
+
 v0.1.4:
 - Added the parameter `angle_range`. It determines how accurate you need to aim.
 

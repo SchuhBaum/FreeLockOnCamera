@@ -1,17 +1,17 @@
-#pragma once
-
 #include "Custom.h"
 #include "Include/CameraFix.cpp"
 #include "Include/Ini.h"
 #include "Include/ModUtils.h"
+#include <chrono>
 #include <sstream>
+#include <thread>
 
 using namespace Custom;
 using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.4";
+const std::string version = "0.1.5";
 
 //
 // config
@@ -64,8 +64,8 @@ void Log_Parameters() {
 void ReadAndLog_Config() {
     Log("ReadAndLog_Config");
     Log_Separator();
-	INIFile config(GetModFolderPath() + "\\config.ini");
-	INIStructure ini;
+    INIFile config(GetModFolderPath() + "\\config.ini");
+    INIStructure ini;
 
     try {
         if (!config.read(ini)) {
@@ -677,6 +677,10 @@ void Apply_SwitchLockOnMod() {
 //
 
 DWORD WINAPI MainThread(LPVOID lpParam) {
+    // this is for ModEngine2-only users; apparently the first change is not applied
+    // otherwise; it reaches the end of scannable memory;
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    
     Log("author " + author);
     Log("version " + version);
     
