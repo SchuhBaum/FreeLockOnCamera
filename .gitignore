@@ -3,6 +3,6 @@
 Config/*
 !Config/config.ini
 
-Mod
+mods
 SourceCode/x64
 Thumbnail.png

@@ -11,7 +11,10 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.5";
+const std::string version = "0.1.6";
+
+// NOTE: Patches might also introduce cases where the searched array of bytes
+//       is not unique anymore. Check if matches are unique.
 
 //
 // config
@@ -226,9 +229,9 @@ void Apply_AngleToCameraMod() {
     // uses the height difference between the candidate and the camera;
     // 48 8d 55 40                              --  lea rdx,[rbp+40]
     // 48 8d 4d 80                              --  lea rcx,[rbp-80]
-    // e8 e2 38 a8 ff                           --  call NormalizeVector(...)
+    // e8 52 5a a7 ff                           --  call NormalizeVector(...)
     // 0f 28 10                                 --  xmm2,[rax]
-    //    
+    //
     // modded:
     // instead of modding it I can change the value before it is normalized (function
     // call) and restore it afterwards; this way the height difference is completely
@@ -240,7 +243,10 @@ void Apply_AngleToCameraMod() {
     // ff 15 02000000 eb 08 new_call_address    --  call NormalizeVector(...)
     // f3 0f 11 75 44                           --  movss [rbp+44],xmm6
     // 0f 28 10                                 --  xmm2,[rax]
-    vanilla = "48 8d 55 40 48 8d 4d 80 e8 e2 38 a8 ff 0f 28 10";
+
+    // Search for the exact offset "52 52 a7 ff". If this address and the new
+    // address don't line up then the game crashes.
+    vanilla = "48 8d 55 40 48 8d 4d 80 e8 52 5a a7 ff 0f 28 10";
     assembly_location = AobScan(vanilla);
     
     if (assembly_location != 0) {
@@ -262,7 +268,10 @@ void Apply_AngleToCameraMod() {
         Hook(assembly_location, new_assembly_location, 2); 
 
         vanilla = "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00";
-        std::string new_call_address = Add_Spaces_To_HexString(Swap_HexString_Endian(NumberToHexString((ULONGLONG)eldenring_assembly_base + 0x18bf90)));
+        // The absolute address offset depends on the relative address offset
+        // in the searched array of bytes. This means that this part is difficult
+        // to make robust against game updates.
+        std::string new_call_address = Add_Spaces_To_HexString(Swap_HexString_Endian(NumberToHexString((ULONGLONG)eldenring_assembly_base + 0x18c460)));
         modded = "f3 0f 10 75 44 f3 0f 11 55 44 48 8d 55 40 48 8d 4d 80 ff 15 02 00 00 00 eb 08 " + new_call_address + " f3 0f 11 75 44 0f 28 10";
         ReplaceExpectedBytesAtAddress((uintptr_t)buffer, vanilla, modded);
         Hook(new_assembly_location + (modded.size() + 1)/3, assembly_location + 16);
@@ -563,6 +572,7 @@ void Apply_LockOnToggleMod() {
     Log("Apply_LockOnToggleMod");
     Log_Separator();
     
+    std::string search_string;
     std::string vanilla;
     std::string modded;
     uintptr_t assembly_location;
@@ -571,15 +581,15 @@ void Apply_LockOnToggleMod() {
     // you have to press the lock-on key every time you lose it; this is not great when
     // you can move the camera freely;
     // 88 86 31 28 00 00        --  mov [rsi+00002831],al
-    // 8b 0d 7a 52 ea 03        --  mov ecx,<address_offset>
+    // 8b 0d 63 fd 13 04        --  mov ecx,<address_offset>
     //
     // modded:
     // make it a toggle instead => prevent it from getting overriden; still not perfect
     // since you have to remember if it is toggled on or off;
     // 90 90 90 90 90 90        --  6x nop
-    // 8b 0d 7a 52 ea 03        --  mov ecx,<address_offset>
-    vanilla = "88 86 31 28 00 00 8b 0d 7a 52 ea 03";
-    modded = "90 90 90 90 90 90 8b 0d 7a 52 ea 03";
+    // 8b 0d 63 fd 13 04        --  mov ecx,<address_offset>
+    vanilla = "88 86 31 28 00 00 8b 0d";
+    modded = "90 90 90 90 90 90 8b 0d";
     assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
     
@@ -604,19 +614,22 @@ void Apply_LockOnToggleMod() {
 
     // vanilla:
     // you lose your toggle after performing a critical hit;
-    // e8 59 e8 91 ff           --  call <+ff91e859>
+    // 48 8b cf                 --  mov rcx,rdi
+    // e8 89 32 8f ff           --  call <offset>
     // 84 c0                    --  test al,al
     // 74 41                    --  je <+41>
     //
     // modded:
     // skip the if-block by jumping always;
-    // e8 59 e8 91 ff           --  call <+ff91e859>
+    // 48 8b cf                 --  mov rcx,rdi
+    // e8 89 32 8f ff           --  call <offset>
     // 84 c0                    --  test al,al
     // eb 41                    --  jmp <+41>
-    vanilla = "e8 59 e8 91 ff 84 c0 74 41";
-    modded = "e8 59 e8 91 ff 84 c0 eb 41";
-    assembly_location = AobScan(vanilla);
-    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
+    search_string = "48 8b cf e8 ? ? ? ? 84 c0 74 41";
+    vanilla = "84 c0 74 41";
+    modded = "84 c0 eb 41";
+    assembly_location = AobScan(search_string);
+    if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location+8, vanilla, modded);
     
     Log_Separator();
     Log_Separator();
