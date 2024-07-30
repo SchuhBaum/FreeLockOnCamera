@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.6";
+const std::string version = "0.1.7";
 
 // NOTE: Patches might also introduce cases where the searched array of bytes
 //       is not unique anymore. Check if matches are unique.
@@ -229,7 +229,7 @@ void Apply_AngleToCameraMod() {
     // uses the height difference between the candidate and the camera;
     // 48 8d 55 40                              --  lea rdx,[rbp+40]
     // 48 8d 4d 80                              --  lea rcx,[rbp-80]
-    // e8 52 5a a7 ff                           --  call NormalizeVector(...)
+    // e8 62 58 a7 ff                           --  call NormalizeVector(...)
     // 0f 28 10                                 --  xmm2,[rax]
     //
     // modded:
@@ -244,9 +244,9 @@ void Apply_AngleToCameraMod() {
     // f3 0f 11 75 44                           --  movss [rbp+44],xmm6
     // 0f 28 10                                 --  xmm2,[rax]
 
-    // Search for the exact offset "52 52 a7 ff". If this address and the new
+    // Search for the exact offset "62 58 a7 ff". If this address and the new
     // address don't line up then the game crashes.
-    vanilla = "48 8d 55 40 48 8d 4d 80 e8 52 5a a7 ff 0f 28 10";
+    vanilla = "48 8d 55 40 48 8d 4d 80 e8 62 58 a7 ff 0f 28 10";
     assembly_location = AobScan(vanilla);
     
     if (assembly_location != 0) {
@@ -266,11 +266,13 @@ void Apply_AngleToCameraMod() {
         
         // removes 14 + 2 bytes from assembly_location => jump-back-address is assembly_location + 16;
         Hook(assembly_location, new_assembly_location, 2); 
-
         vanilla = "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00";
+
         // The absolute address offset depends on the relative address offset
         // in the searched array of bytes. This means that this part is difficult
         // to make robust against game updates.
+        // Update: This time only the local offset in the vanilla string changed.
+        // The offset from the eldenring.exe base address remained at 0x18c460.
         std::string new_call_address = Add_Spaces_To_HexString(Swap_HexString_Endian(NumberToHexString((ULONGLONG)eldenring_assembly_base + 0x18c460)));
         modded = "f3 0f 10 75 44 f3 0f 11 55 44 48 8d 55 40 48 8d 4d 80 ff 15 02 00 00 00 eb 08 " + new_call_address + " f3 0f 11 75 44 0f 28 10";
         ReplaceExpectedBytesAtAddress((uintptr_t)buffer, vanilla, modded);
