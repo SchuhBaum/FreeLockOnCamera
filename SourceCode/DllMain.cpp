@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.1.7";
+const std::string version = "0.1.8";
 
 // NOTE: Patches might also introduce cases where the searched array of bytes
 //       is not unique anymore. Check if matches are unique.
@@ -21,15 +21,14 @@ const std::string version = "0.1.7";
 //
 
 bool is_free_lock_on_camera_enabled = true;
-bool is_health_bar_hidden = true;
+bool is_health_bar_hidden           = true;
 bool is_lock_on_camera_zoom_enabled = true;
+bool is_only_using_camera_yaw       = true;
+bool is_toggle                      = true;
 
-bool is_only_using_camera_yaw = true;
-bool is_toggle = true;
-
-float angle_range = 0.7F;
+float angle_range                      = 0.7F;
 float angle_to_camera_score_multiplier = 6000.0F;
-float camera_height = 1.45F;
+float camera_height                    = 1.45F;
 
 std::string target_switching_mode = "modded_switch";
 
@@ -77,12 +76,12 @@ void ReadAndLog_Config() {
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
             ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
             
-            ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"] = std::to_string(is_free_lock_on_camera_enabled);
-            ini["FreeLockOnCamera"]["is_health_bar_hidden"] = std::to_string(is_health_bar_hidden);
-            ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"] = std::to_string(is_lock_on_camera_zoom_enabled);
-            ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = std::to_string(is_only_using_camera_yaw);
+            ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"] = is_free_lock_on_camera_enabled ? "true" : "false";
+            ini["FreeLockOnCamera"]["is_health_bar_hidden"] = is_health_bar_hidden ? "true" : "false";
+            ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"] = is_lock_on_camera_zoom_enabled ? "true" : "false";
+            ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = is_only_using_camera_yaw ? "true" : "false";
             
-            ini["FreeLockOnCamera"]["is_toggle"] = std::to_string(is_toggle);
+            ini["FreeLockOnCamera"]["is_toggle"] = is_toggle ? "true" : "false";
             ini["FreeLockOnCamera"]["target_switching_mode"] = target_switching_mode;
             config.write(ini, true);
             Log_Parameters();

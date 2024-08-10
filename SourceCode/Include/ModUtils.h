@@ -35,7 +35,7 @@
 #include <chrono>
 #include <iomanip>
 
-#include "ini.h"
+#include "Ini.h"
 
 namespace ModUtils
 {
