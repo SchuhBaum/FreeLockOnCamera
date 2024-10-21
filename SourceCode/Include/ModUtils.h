@@ -386,14 +386,27 @@ namespace ModUtils
                     {
                         if (aobTokens[i] == muAobMask)
                         {
+                            // Wildcard found => skip to next byte.
                             currentAddress++;
                             continue;
                         } 
                         else if (*(unsigned char*)currentAddress != (unsigned char)std::stoul(aobTokens[i], nullptr, 16))
                         {
                             // modded;
-                            // I need to check if the index is zero; otherwise it didn't find my array of bytes 
-                            // "48 89 5c 24 ..." in the memory bytes "48 89 5c 48 89 5c 24 ...";
+
+                            // Only advance the address if i is zero. That caes
+                            // is important. Otherwise, you get an infinite
+                            // loop. But for i > 0 it would skip one character. 
+                            // You would not find the array of bytes "48 89 5c
+                            // 24 ..." in "48 89 5c 48 89 5c 24 ...". The
+                            // second "48" would get skipped.
+
+                            // There might still be situations that are not
+                            // handled. You likely would need to save the
+                            // address before the inner loop and increase it by
+                            // exactly one for each loop. Currently every part
+                            // of memory is only looked at once.
+
                             if (i == 0) currentAddress++;
                             break;
                         }
