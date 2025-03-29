@@ -1,20 +1,36 @@
 
-$wd = Get-Location
-Set-Location "c:\steam\steamapps\common\elden ring\modding\freelockoncamera"
+$dir = $PSScriptRoot
+$ErrorActionPreference = "Stop"
 
-$modName           = "FreeLockOnCamera"
-$projectFile       = "./SourceCode/" + $modName + ".vcxproj"
+$mod_name     = "FreeLockOnCamera"
+$project_file = "$dir\sourcecode\" + $mod_name + ".vcxproj"
 
-$destinationFolder = "./mods/"
-$sourceFolder      = "./SourceCode/x64/Release/"
+#
+#
+
+$src = "$dir\..\..\game\mods"
+$dst = "$dir\mods"
+
+New-Item -ItemType Directory -Path $src -Force | Out-Null
+if ((Test-Path $src) -and -not (Test-Path $dst)) {
+    New-Item -ItemType SymbolicLink -Path $dst -Target $src
+}
+
+#
+#
+
+$src = "$dir\sourcecode\x64\release"
+$dst = "$dir\mods"
 
 if ($args.Length -gt 0) {
-    msbuild $projectFile /p:Configuration=Release /p:Platform=x64 /t:Rebuild
+    msbuild $project_file /p:Configuration=Release /p:Platform=x64 /t:Rebuild
 } else {
-    msbuild $projectFile /p:Configuration=Release /p:Platform=x64 $args
+    msbuild $project_file /p:Configuration=Release /p:Platform=x64 $args
 }
-Copy-Item -Path ($sourceFolder + $modName + ".dll") -Destination $destinationFolder -Force
-Copy-Item -Path ($sourceFolder + $modName + ".pdb") -Destination $destinationFolder -Force
 
-Set-Location $wd
+Copy-Item -Path "$src\$mod_name.dll" -Destination $dst -Force
+Copy-Item -Path "$src\$mod_name.pdb" -Destination $dst -Force
+
+New-Item -ItemType Directory -Path "$dst\FreeLockOnCamera" -Force | Out-Null
+Copy-Item -Path "$dir\config\config.ini" -Destination "$dst\FreeLockOnCamera" -Force
 

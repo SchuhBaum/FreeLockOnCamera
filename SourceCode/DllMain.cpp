@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.2.0";
+const std::string version = "0.2.1";
 
 // NOTE: Patches might also introduce cases where the searched array of bytes
 //       is not unique anymore. Check if matches are unique.
@@ -29,6 +29,7 @@ bool is_toggle                      = true;
 float angle_range                      = 0.7F;
 float angle_to_camera_score_multiplier = 6000.0F;
 float camera_height                    = 1.45F;
+float additional_range                 = 0.0F;
 
 std::string target_switching_mode = "modded_switch";
 
@@ -44,19 +45,24 @@ std::string Get_HexString(float f) {
 }
 
 void Log_Parameters() {
+    Log("additional_range");
+    Log("  float: ", additional_range, "  hex: ", Get_HexString(additional_range));
+
     Log("angle_range");
     Log("  float: ", angle_range, "  hex: ", Get_HexString(angle_range));
+
     Log("angle_to_camera_score_multiplier");
     Log("  float: ", angle_to_camera_score_multiplier, "  hex: ", Get_HexString(angle_to_camera_score_multiplier));
 
     Log("camera_height");
     Log("  float: ", camera_height, "  hex: ", Get_HexString(camera_height));
+
     Log("is_free_lock_on_camera_enabled: ", is_free_lock_on_camera_enabled ? "true" : "false");
     Log("is_health_bar_hidden: ", is_health_bar_hidden ? "true" : "false");
-
     Log("is_lock_on_camera_zoom_enabled: ", is_lock_on_camera_zoom_enabled ? "true" : "false");
     Log("is_only_using_camera_yaw: ", is_only_using_camera_yaw ? "true" : "false");
     Log("is_toggle: ", is_toggle ? "true" : "false");
+
     Log("target_switching_mode: ", target_switching_mode);
 
     Log_Separator();
@@ -72,39 +78,43 @@ void ReadAndLog_Config() {
     try {
         if (!config.read(ini)) {
             Log("The config file was not found. Create a new one.");
-            ini["FreeLockOnCamera"]["angle_range"] = std::to_string(angle_range);
+
+            ini["FreeLockOnCamera"]["additional_range"]                 = std::to_string(additional_range);
+            ini["FreeLockOnCamera"]["angle_range"]                      = std::to_string(angle_range);
             ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"] = std::to_string(static_cast<int>(angle_to_camera_score_multiplier));
-            ini["FreeLockOnCamera"]["camera_height"] = std::to_string(camera_height);
+            ini["FreeLockOnCamera"]["camera_height"]                    = std::to_string(camera_height);
 
             ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"] = is_free_lock_on_camera_enabled ? "true" : "false";
-            ini["FreeLockOnCamera"]["is_health_bar_hidden"] = is_health_bar_hidden ? "true" : "false";
+            ini["FreeLockOnCamera"]["is_health_bar_hidden"]           = is_health_bar_hidden ? "true" : "false";
             ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"] = is_lock_on_camera_zoom_enabled ? "true" : "false";
-            ini["FreeLockOnCamera"]["is_only_using_camera_yaw"] = is_only_using_camera_yaw ? "true" : "false";
+            ini["FreeLockOnCamera"]["is_only_using_camera_yaw"]       = is_only_using_camera_yaw ? "true" : "false";
 
-            ini["FreeLockOnCamera"]["is_toggle"] = is_toggle ? "true" : "false";
+            ini["FreeLockOnCamera"]["is_toggle"]             = is_toggle ? "true" : "false";
             ini["FreeLockOnCamera"]["target_switching_mode"] = target_switching_mode;
+
             config.write(ini, true);
+
             Log_Parameters();
             return;
         }
 
-        angle_range = stof(ini["FreeLockOnCamera"]["angle_range"]);
+        additional_range                 = stof(ini["FreeLockOnCamera"]["additional_range"]);
+        angle_range                      = stof(ini["FreeLockOnCamera"]["angle_range"]);
         angle_to_camera_score_multiplier = stoi(ini["FreeLockOnCamera"]["angle_to_camera_score_multiplier"]);
-        camera_height = stof(ini["FreeLockOnCamera"]["camera_height"]);
+        camera_height                    = stof(ini["FreeLockOnCamera"]["camera_height"]);
 
         std::string str;
         str = ini["FreeLockOnCamera"]["is_free_lock_on_camera_enabled"];
         std::istringstream(str) >> std::boolalpha >> is_free_lock_on_camera_enabled;
         str = ini["FreeLockOnCamera"]["is_health_bar_hidden"];
         std::istringstream(str) >> std::boolalpha >> is_health_bar_hidden;
-
         str = ini["FreeLockOnCamera"]["is_lock_on_camera_zoom_enabled"];
         std::istringstream(str) >> std::boolalpha >> is_lock_on_camera_zoom_enabled;
         str = ini["FreeLockOnCamera"]["is_only_using_camera_yaw"];
         std::istringstream(str) >> std::boolalpha >> is_only_using_camera_yaw;
-
         str = ini["FreeLockOnCamera"]["is_toggle"];
         std::istringstream(str) >> std::boolalpha >> is_toggle;
+
         str = ini["FreeLockOnCamera"]["target_switching_mode"];
         if (str == "vanilla_switch" || str == "modded_keep" || str == "modded_switch") {
             target_switching_mode = str;
@@ -112,6 +122,7 @@ void ReadAndLog_Config() {
 
         Log_Parameters();
         return;
+
     } catch(const std::exception& exception) {
         Log("Could not read or create the config file. Use defaults.");
         Log_Parameters();
@@ -462,8 +473,8 @@ void Apply_KeepLockOnMod() {
     Log_Separator();
 }
 
-void Apply_LockOnCloseRangeMod() {
-    Log("Apply_LockOnCloseRangeMod");
+void Apply_LockOnRangeMod() {
+    Log("Apply_LockOnRangeMod");
     Log_Separator();
 
     std::string vanilla;
@@ -471,17 +482,26 @@ void Apply_LockOnCloseRangeMod() {
     uintptr_t assembly_location;
 
     // vanilla:
-    // this variable has to do with setting a range value; when you are in close range
-    // then the lock-on relies less on the camera direction;
-    // f3 0f 58 ca                  --  xmm1,XMM2
-    // f3 0f 11 8e 30 29 00 00      --  dword ptr [RSI + 0x2930],xmm1
+    // The absolute lock-on range is saved in rsi+2930 (and possibly other
+    // locations). That value is checked and reset via code. Changing it
+    // directly will not work. Plus, it has side effects. Changing only that
+    // value prevents you from changing targets at long range.
+    //
+    // c7 83 30 29 00 00 00 00 70 41 -- mov [RSI + 0x2930], 15F
     //
     // modded:
-    // set this range value to zero;
-    // c7 86 30290000 00000000      --  mov [RSI + 0x2930],0
-    // 90 90                        --  2x nop
-    vanilla = "f3 0f 58 ca f3 0f 11 8e 30 29 00 00";
-    modded = "c7 86 30 29 00 00 00 00 00 00 90 90";
+    // Override the additional-range value instead (stored at rsi+2924).
+    // In vanilla, this one is zero initialized and never touched. This has not
+    // the side effect compared to changing the range directly.
+    //
+    // I assume that the range is zero initialized as well. The reset function
+    // does a smooth transition. If it is not zero initialized it might take
+    // some time before it reaches 15f again.
+    //
+    // c7 83 24 29 00 00 ** ** ** ** -- mov [RSI + 0x2924], additional_range
+
+    vanilla = "c7 83 30 29 00 00 00 00 70 41";
+    modded = "c7 83 24 29 00 00 " + Get_HexString(additional_range);
     assembly_location = AobScan(vanilla);
     if (assembly_location != 0) ReplaceExpectedBytesAtAddress(assembly_location, vanilla, modded);
 
@@ -718,19 +738,18 @@ DWORD WINAPI MainThread(LPVOID lpParam) {
     Log_Separator();
     ReadAndLog_Config();
 
-    if (angle_range != 0.7F) Apply_AngleRangeMod();
+    if (angle_range != 0.7F)      Apply_AngleRangeMod();
     if (is_only_using_camera_yaw) Apply_AngleToCameraMod();
-    if (camera_height != 1.45F) Apply_CameraHeightMod();
+    if (camera_height != 1.45F)   Apply_CameraHeightMod();
     Apply_FreeLockOnCameraMod();
 
     Apply_KeepLockOnMod();
-    // Apply_LockOnCloseRangeMod();
-    if (is_health_bar_hidden) Apply_LockOnHealthBarMod();
-    Apply_LockOnScoreMod(); // makes LockOnCloseRangeMod useless;
+    if (is_health_bar_hidden)     Apply_LockOnHealthBarMod();
+    if (additional_range != 0.0F) Apply_LockOnRangeMod();
+    Apply_LockOnScoreMod();
 
-    // Apply_LockOnSensitivityMod();
-    if (is_toggle) Apply_LockOnToggleMod();
-    if (target_switching_mode != "vanilla_switch") Apply_SwitchLockOnMod(); // makes LockOnSensitivityMod useless;
+    if (is_toggle)                                 Apply_LockOnToggleMod();
+    if (target_switching_mode != "vanilla_switch") Apply_SwitchLockOnMod();
 
     // this can fail when using the original CameraFix mod; in that case it can take
     // a while and the logs might misalign or get spammed otherwise;
