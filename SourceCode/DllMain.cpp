@@ -72,7 +72,11 @@ void Log_Parameters() {
 void ReadAndLog_Config() {
     Log("ReadAndLog_Config");
     Log_Separator();
-    INIFile config(GetModFolderPath() + "\\config.ini");
+
+    //Log(GetModFolderPath()); //should be mods\FreeLockOnCamera
+    //Log(GetModFolderPath(false)); //should be the same as first
+    //Log(GetModFolderPath(true)); // should be a new thing
+    INIFile config(GetModFolderPath(true)+"\\config.ini"); //Extended GetModFolderPath() to accept an optional parameter, newPath.
     INIStructure ini;
 
     try {
