@@ -83,7 +83,8 @@ namespace ModUtils
         std::chrono::system_clock::time_point lastPassedCheckTime;
     };
 
-    static std::string _GetModuleName(bool mainProcessModule)
+    //ALTERED: ALLOWED KEEPING THE TRUE PATH BEFORE THE MODULE NAME
+    static std::string _GetModuleName(bool mainProcessModule, bool removePath = true)
     {
         HMODULE module = NULL;
 
@@ -94,10 +95,16 @@ namespace ModUtils
         }
 
         char lpFilename[MAX_PATH];
-        GetModuleFileNameA(module, lpFilename, sizeof(lpFilename));
-        std::string moduleName = strrchr(lpFilename, '\\');
-        moduleName = moduleName.substr(1, moduleName.length());
+        GetModuleFileNameA(module, lpFilename, MAX_PATH);
+        std::string moduleName;
 
+        if (removePath)
+        {
+            moduleName = strrchr(lpFilename, '\\')
+            moduleName = moduleName.substr(1, moduleName.length());
+        }
+        else moduleName = lpFilename;
+            
         if (!mainProcessModule)
         {
             moduleName.erase(moduleName.find(".dll"), moduleName.length());
@@ -121,9 +128,15 @@ namespace ModUtils
         return currentModName;
     }
 
-    static std::string GetModFolderPath()
+    //ALTERED: pass removePath (as !newPath) and don't add "mods\\" if using newPath.
+    //explanation: newPath is relative to the dll's location. The old path is relative to the .exe's location.
+    //newPath should work for everything. Old path works for mod loader, and most versions of mod engine, but NOT mod engine 3. 
+    static std::string GetModFolderPath(bool newPath = false)
     {
-        return std::string("mods\\" + GetCurrentModName());
+        static std::string modFolderPath;
+        if(newPath)     modFolderPath =  _GetModuleName(false, false);
+        else            modFolderPath = "mods\\" + GetCurrentModName();
+        return modFolderPath;
     }
 
     static void OpenModLogFile()
