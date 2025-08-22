@@ -100,7 +100,7 @@ namespace ModUtils
 
         if (removePath)
         {
-            moduleName = strrchr(lpFilename, '\\')
+            moduleName = strrchr(lpFilename, '\\');
             moduleName = moduleName.substr(1, moduleName.length());
         }
         else moduleName = lpFilename;
