@@ -83,8 +83,9 @@ namespace ModUtils
         std::chrono::system_clock::time_point lastPassedCheckTime;
     };
 
-    //ALTERED: ALLOWED KEEPING THE TRUE PATH BEFORE THE MODULE NAME
-    static std::string _GetModuleName(bool mainProcessModule, bool removePath = true)
+    //new function. It's basically the first half of the old _GetModuleName(), but returns the string before any manipulation to it is done.
+    //This separation of pulling the raw data and processing it makes it more versatile.
+    static std::string _GetModulePath(bool mainProcessModule)
     {
         HMODULE module = NULL;
 
@@ -96,15 +97,21 @@ namespace ModUtils
 
         char lpFilename[MAX_PATH];
         GetModuleFileNameA(module, lpFilename, MAX_PATH);
-        std::string moduleName;
+        std::string modulePath = lpFilename;
 
-        if (removePath)
-        {
-            moduleName = strrchr(lpFilename, '\\');
-            moduleName = moduleName.substr(1, moduleName.length());
-        }
-        else moduleName = lpFilename;
-            
+        return modulePath;
+    }
+
+    //Most of the logic of reflecting on its module is moved to _GetModulePath().
+    //Because the name is just a subset of its full path, and the old function simply did some string manipulation to it.
+    //The string manipulation remains here.
+    static std::string _GetModuleName(bool mainProcessModule)
+    {
+        std::string moduleName;
+        moduleName = _GetModulePath(mainProcessModule);
+        moduleName = strrchr(moduleName.c_str(), '\\');
+        moduleName = moduleName.substr(1, moduleName.length());
+
         if (!mainProcessModule)
         {
             moduleName.erase(moduleName.find(".dll"), moduleName.length());
@@ -128,14 +135,19 @@ namespace ModUtils
         return currentModName;
     }
 
-    //ALTERED: pass removePath (as !newPath) and don't add "mods\\" if using newPath.
-    //explanation: newPath is relative to the dll's location. The old path is relative to the .exe's location.
-    //newPath should work for everything. Old path works for mod loader, and most versions of mod engine, but NOT mod engine 3. 
-    static std::string GetModFolderPath(bool newPath = false)
+    //ALTERED: use an absolute path, relative to .DLL rather than Eldenring.exe.
+    //Now uses _GetModulePath() instead of GetCurrentModName().
+    //The old one simply added "mods\\" to the start of GetCurrentModName().
+    //This one gets the path of the .dll and removes the ".dll" file extension.
+    //Old output:
+    //  "mods\\MODNAME"
+    //New output:
+    //  "DRIVELETTER:\\MODPACKDIRECTORY\\MODNAME"
+    static std::string GetModFolderPath()
     {
         static std::string modFolderPath;
-        if(newPath)     modFolderPath =  _GetModuleName(false, false);
-        else            modFolderPath = "mods\\" + GetCurrentModName();
+        modFolderPath =  _GetModulePath(false);
+        modFolderPath.erase(modFolderPath.find(".dll"), modFolderPath.length());
         return modFolderPath;
     }
 

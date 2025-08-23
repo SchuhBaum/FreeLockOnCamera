@@ -73,10 +73,9 @@ void ReadAndLog_Config() {
     Log("ReadAndLog_Config");
     Log_Separator();
 
-    //Log(GetModFolderPath()); //should be mods\FreeLockOnCamera
-    //Log(GetModFolderPath(false)); //should be the same as first
-    //Log(GetModFolderPath(true)); // should be a new thing
-    INIFile config(GetModFolderPath(true)+"\\config.ini"); //Extended GetModFolderPath() to accept an optional parameter, newPath.
+    std::string configPath = GetModFolderPath()+"\\config.ini";
+    Log("INI FILE PATH: ", configPath);
+    INIFile config(configPath);
     INIStructure ini;
 
     try {

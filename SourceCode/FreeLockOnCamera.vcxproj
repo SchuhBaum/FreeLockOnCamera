@@ -10,6 +10,12 @@
   <ItemGroup>
     <ClCompile Include="**/*.cpp"/>
     <!-- <Link Include="d3d11.lib;d3d12.lib;D3DCompiler.lib"/> -->
+	  <Content Include="**/RunMod.me3">
+		  <Link>RunMod.me3</Link>
+		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		  <SubType>Designer</SubType>
+		  <!-- just copying RunMod.me3 to the release folder for convenience. No more moving to game\mods\FreeLockOnCamera.dll, testing is now as simple as double clicking the profile (with me3 installed). -->
+	  </Content>
   </ItemGroup>
   
   <ItemDefinitionGroup>
