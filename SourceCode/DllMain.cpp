@@ -73,9 +73,11 @@ void ReadAndLog_Config() {
     Log("ReadAndLog_Config");
     Log_Separator();
 
-    std::string configPath = GetModFolderPath()+"\\config.ini";
+    // modded;
+    std::string configPath = GetModFolderPath() + "\\config.ini"; // "absolute\\path\\to\\mod\\config.ini"
     Log("INI FILE PATH: ", configPath);
     INIFile config(configPath);
+    
     INIStructure ini;
 
     try {
