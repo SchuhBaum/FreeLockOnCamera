@@ -141,7 +141,7 @@ namespace ModUtils
     static std::string GetModFolderPath()
     {
         // modded;
-        static std::string modFolderPath = "NULL"; // "NULL"
+        static std::string modFolderPath = "NULL"; // "NULL" (i.e. runs the below if statement on first call)
         if (modFolderPath == "NULL") 
         {
             modFolderPath =  _GetModulePath(false); // "absolute\\path\\to\\mod.dll"
