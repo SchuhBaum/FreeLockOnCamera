@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.2.1";
+const std::string version = "0.2.2";
 
 // NOTE: Patches might also introduce cases where the searched array of bytes
 //       is not unique anymore. Check if matches are unique.
@@ -72,7 +72,12 @@ void Log_Parameters() {
 void ReadAndLog_Config() {
     Log("ReadAndLog_Config");
     Log_Separator();
-    INIFile config(GetModFolderPath() + "\\config.ini");
+
+    // modded;
+    std::string configPath = GetModFolderPath() + "\\config.ini"; // "absolute\\path\\to\\mod\\config.ini"
+    Log("INI FILE PATH: ", configPath);
+    INIFile config(configPath);
+    
     INIStructure ini;
 
     try {

@@ -1,0 +1,7 @@
+profileVersion = "v1"
+
+[[supports]]
+game = "eldenring"
+
+[[natives]]
+path = 'FreeLockOnCamera.dll'
