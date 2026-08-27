@@ -1,5 +1,7 @@
 
 $dir = $PSScriptRoot
+$ErrorActionPreference = "Stop"
+
 $downloads_path = "$HOME\downloads"
 $zip_path = "$downloads_path\FreeLockOnCamera.zip"
 

@@ -6,6 +6,9 @@ Config/*
 !Config/config.ini
 
 mods
+SourceCode/.vs
+SourceCode/FreeLockOnCamera
+SourceCode/FreeLockOnCamera.vcxproj.user
 SourceCode/x64
 Thumbnail.png
 /.vs

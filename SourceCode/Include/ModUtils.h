@@ -151,6 +151,20 @@ namespace ModUtils
         return modFolderPath;
     }
 
+    static std::string GetTimestamp()
+    {
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t time = std::chrono::system_clock::to_time_t(now);
+
+        std::tm local_time;
+        localtime_s(&local_time, &time);
+
+        std::stringstream stream;
+        stream << std::put_time(&local_time, "%Y-%m-%d %H:%M:%S");
+
+        return stream.str();
+    }
+
     static void OpenModLogFile()
     {
         if (!muLogFile.is_open())
@@ -166,7 +180,8 @@ namespace ModUtils
         OpenModLogFile();
 
         std::stringstream stream;
-        stream << GetCurrentModName() << " > ";
+        stream << "[" << GetTimestamp() << "] "
+               << GetCurrentModName() << " > ";
         (stream << ... << args) << std::endl;
         std::cout << stream.str();
 

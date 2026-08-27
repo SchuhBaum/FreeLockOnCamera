@@ -1,4 +1,4 @@
-#include "custom.h"
+#include "Custom.h"
 
 std::string Custom::Add_Spaces_To_HexString(const std::string str) {
     size_t str_size = str.size();
@@ -11,6 +11,28 @@ std::string Custom::Add_Spaces_To_HexString(const std::string str) {
         result_stream << " ";
     }
     return result_stream.str();
+}
+
+std::string Custom::Aob_At_Address(uintptr_t address, size_t size)
+{
+    const unsigned char *bytes = reinterpret_cast<const unsigned char *>(address);
+
+    std::ostringstream result_stream;
+    result_stream << std::hex << std::setfill('0');
+    for (size_t i = 0; i < size; ++i) {
+        result_stream << std::setw(2) << static_cast<unsigned int>(bytes[i]);
+        if (i + 1 < size) { result_stream << ' '; }
+    }
+
+    return result_stream.str();
+}
+
+std::string Custom::Aob_From_Number(float number) {
+    std::string aob =
+        Add_Spaces_To_HexString(
+            Swap_HexString_Endian(
+                Convert_Float_To_LowercaseHexString(number)));
+    return aob;
 }
 
 std::string Custom::Convert_Float_To_LowercaseHexString(const float value) {

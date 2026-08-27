@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.2.2";
+const std::string version = "0.2.3";
 
 // NOTE: Patches might also introduce cases where the searched array of bytes
 //       is not unique anymore. Check if matches are unique.
@@ -39,7 +39,7 @@ std::string target_switching_mode = "modded_switch";
 
 std::string Get_HexString(float f) {
     // f = 0.0F produces an empty string; not sure why;
-    std::string hex_string = Add_Spaces_To_HexString(Swap_HexString_Endian(Convert_Float_To_LowercaseHexString(f)));
+    std::string hex_string = Aob_From_Number(f);
     if (hex_string.empty()) return "00 00 00 00";
     return hex_string;
 }
@@ -242,29 +242,36 @@ void Apply_AngleToCameraMod() {
 
     // vanilla:
     // uses the height difference between the candidate and the camera;
-    // 48 8d 55 40                              --  lea rdx,[rbp+40]
-    // 48 8d 4d 80                              --  lea rcx,[rbp-80]
-    // e8 02 58 a7 ff                           --  call NormalizeVector(...)
-    // 0f 28 10                                 --  xmm2,[rax]
+    // 48 8d 55 40                                --  lea rdx,[rbp+40]
+    // 48 8d 4d 80                                --  lea rcx,[rbp-80]
+    // e8 relative_call_address                   --  call NormalizeVector(...)
+    // 0f 28 10                                   --  xmm2,[rax]
     //
     // modded:
-    // instead of modding it I can change the value before it is normalized (function
-    // call) and restore it afterwards; this way the height difference is completely
-    // ignored but only for the score; way less janky;
-    // f3 0f 10 75 44                           --  movss xmm6,[rbp+44]
-    // f3 0f 11 55 44                           --  movss [rbp+44],xmm2     -- xmm2 is a function parameter as well and set to zero
-    // 48 8d 55 40                              --  lea rdx,[rbp+40]
-    // 48 8d 4d 80                              --  lea rcx,[rbp-80]
-    // ff 15 02000000 eb 08 new_call_address    --  call NormalizeVector(...)
-    // f3 0f 11 75 44                           --  movss [rbp+44],xmm6
-    // 0f 28 10                                 --  xmm2,[rax]
+    // instead of modding it I can change the value before it is normalized
+    // (function call) and restore it afterwards; this way the height difference
+    // is completely ignored but only for the score; way less janky;
+    // f3 0f 10 75 44                             --  movss xmm6,[rbp+44]
+    // f3 0f 11 55 44                             --  movss [rbp+44],xmm2     -- xmm2 is a function parameter as well and set to zero
+    // 48 8d 55 40                                --  lea rdx,[rbp+40]
+    // 48 8d 4d 80                                --  lea rcx,[rbp-80]
+    // ff 15 02000000 eb 08 absolute_call_address --  call NormalizeVector(...)
+    // f3 0f 11 75 44                             --  movss [rbp+44],xmm6
+    // 0f 28 10                                   --  xmm2,[rax]
 
-    // Search for the exact offset "82 56 a7 ff". The game crashes if this does
-    // not line up with new_call_address later.
-    vanilla = "48 8d 55 40 48 8d 4d 80 e8 82 56 a7 ff 0f 28 10";
+    vanilla = "48 8d 55 40 48 8d 4d 80 e8 ? ? ? ? 0f 28 10";
     assembly_location = AobScan(vanilla);
-
     if (assembly_location != 0) {
+        uintptr_t call_instruction = assembly_location + 8;
+        Log("Relative call address bytes: ", Aob_At_Address(call_instruction+1, 4));
+
+        std::int32_t relative_call_address =
+            *reinterpret_cast<std::int32_t *>(call_instruction + 1);
+        uintptr_t absolute_call_address = call_instruction + 5 + relative_call_address;
+        std::string absolute_call_address_aob = Aob_From_Number(absolute_call_address);
+        Log("Absolute call address bytes: ", absolute_call_address_aob);
+
+        //
         // https://stackoverflow.com/questions/40936534/how-to-alloc-a-executable-memory-buffer
         MODULEINFO module_info;
         GetModuleInformation(GetCurrentProcess(), GetModuleHandleA("eldenring.exe"), &module_info, sizeof(module_info));
@@ -283,15 +290,7 @@ void Apply_AngleToCameraMod() {
         Hook(assembly_location, new_assembly_location, 2);
         vanilla = "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00";
 
-        // The absolute address offset depends on the relative address offset
-        // in the searched array of bytes. This means that this part is difficult
-        // to make robust against game updates.
-        // Update: This time only the local offset in the vanilla string changed.
-        // The offset from the eldenring.exe base address remained at 0x18c460.
-        // Update: +1
-        // Update: +1. If this stays like this then I try to use wildcards.
-        std::string new_call_address = Add_Spaces_To_HexString(Swap_HexString_Endian(NumberToHexString((ULONGLONG)eldenring_assembly_base + 0x18c460)));
-        modded = "f3 0f 10 75 44 f3 0f 11 55 44 48 8d 55 40 48 8d 4d 80 ff 15 02 00 00 00 eb 08 " + new_call_address + " f3 0f 11 75 44 0f 28 10";
+        modded = "f3 0f 10 75 44 f3 0f 11 55 44 48 8d 55 40 48 8d 4d 80 ff 15 02 00 00 00 eb 08 " + absolute_call_address_aob + " f3 0f 11 75 44 0f 28 10";
         ReplaceExpectedBytesAtAddress((uintptr_t)buffer, vanilla, modded);
         Hook(new_assembly_location + (modded.size() + 1)/3, assembly_location + 16);
 

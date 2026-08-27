@@ -1,6 +1,5 @@
 
 $dir = $PSScriptRoot
-$ErrorActionPreference = "Stop"
 
 $mod_name     = "FreeLockOnCamera"
 $project_file = "$dir\sourcecode\" + $mod_name + ".vcxproj"
@@ -23,9 +22,15 @@ $src = "$dir\sourcecode\x64\release"
 $dst = "$dir\mods"
 
 if ($args.Length -gt 0) {
-    msbuild $project_file /p:Configuration=Release /p:Platform=x64 /t:Rebuild
+    msbuild.exe $project_file /p:Configuration=Release /p:Platform=x64 /t:Rebuild
 } else {
-    msbuild $project_file /p:Configuration=Release /p:Platform=x64 $args
+    msbuild.exe $project_file /p:Configuration=Release /p:Platform=x64 $args
+}
+
+if ($LASTEXITCODE -ne 0 -or $_)
+{
+    Write-Host "Build failed."
+    exit(1)
 }
 
 Copy-Item -Path "$src\$mod_name.dll" -Destination $dst -Force
