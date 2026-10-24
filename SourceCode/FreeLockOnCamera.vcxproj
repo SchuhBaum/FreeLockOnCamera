@@ -3,7 +3,7 @@
 
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <Version>0.2.3</Version>
+    <Version>0.2.4</Version>
     <RootNamespace>FreeLockOnCamera</RootNamespace>
   </PropertyGroup>
   

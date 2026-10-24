@@ -365,114 +365,156 @@ namespace ModUtils
             << (unsigned int)number; // The << operator overload for unsigned chars screws us over unless this cast is done
         return stream.str();
     }
- 
-    static uintptr_t AobScan(std::string aob)
+
+    static bool
+    TryGetMemoryInformation(
+      MEMORY_BASIC_INFORMATION* memoryInfo,
+      uintptr_t regionStart)
     {
-        std::vector<std::string> aobTokens = TokenifyAobString(aob);
-
-        DWORD processId = GetCurrentProcessId();
-        uintptr_t regionStart = GetProcessBaseAddress(processId);
-        Log("Process name: ", GetCurrentProcessName());
-        Log("Process ID: ", processId);
-        Log("Process base address: ", NumberToHexString(regionStart));
-        Log("AOB: ", aob);
-
-        if (!VerifyAob(aob))
+      *memoryInfo = {0};
+      size_t bytesRead = VirtualQuery((void*)regionStart, memoryInfo, sizeof(MEMORY_BASIC_INFORMATION));
+      if (bytesRead == 0)
+      {
+        DWORD error = GetLastError();
+        if (error == ERROR_INVALID_PARAMETER)
         {
-            return 0;
-        };
-
-        size_t numRegionsChecked = 0;
-        size_t maxRegionsToCheck = 10000;
-        uintptr_t currentAddress = 0;
-        while (numRegionsChecked < maxRegionsToCheck)
+          Log("Reached end of scannable memory.");
+        }
+        else
         {
-            MEMORY_BASIC_INFORMATION memoryInfo = { 0 };
-            if (VirtualQuery((void*)regionStart, &memoryInfo, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
-            {
-                DWORD error = GetLastError();
-                if (error == ERROR_INVALID_PARAMETER)
-                {
-                    Log("Reached end of scannable memory.");
-                }
-                else
-                {
-                    Log("VirtualQuery failed, error code: ", error);
-                }
-                break;
-            }
-            regionStart = (uintptr_t)memoryInfo.BaseAddress;
-            uintptr_t regionSize = (uintptr_t)memoryInfo.RegionSize;
-            uintptr_t regionEnd = regionStart + regionSize;
-            uintptr_t protection = (uintptr_t)memoryInfo.Protect;
-            uintptr_t state = (uintptr_t)memoryInfo.State;
+          Log("VirtualQuery failed, error code: ", error);
+        }
+      }
+      return bytesRead != 0;
+    }
 
-            bool isMemoryReadable = (
-                protection == PAGE_EXECUTE_READWRITE
-                || protection == PAGE_READWRITE
-                || protection == PAGE_READONLY
-                || protection == PAGE_WRITECOPY
-                || protection == PAGE_EXECUTE_WRITECOPY)
-                && state == MEM_COMMIT;
-            if (isMemoryReadable)
-            {
-                // modded;
-                // Log("Checking region: ", NumberToHexString(regionStart));
-                
-                currentAddress = regionStart;
-                while (currentAddress < regionEnd - aobTokens.size())
-                {
-                    for (size_t i = 0; i < aobTokens.size(); i++)
-                    {
-                        if (aobTokens[i] == muAobMask)
-                        {
-                            // Wildcard found => skip to next byte.
-                            currentAddress++;
-                            continue;
-                        } 
-                        else if (*(unsigned char*)currentAddress != (unsigned char)std::stoul(aobTokens[i], nullptr, 16))
-                        {
-                            // modded;
+    static bool
+    IsMemoryReadable(
+      MEMORY_BASIC_INFORMATION memoryInfo)
+    {
+      uintptr_t protection = (uintptr_t)memoryInfo.Protect;
+      uintptr_t state = (uintptr_t)memoryInfo.State;
 
-                            // Only advance the address if i is zero. That caes
-                            // is important. Otherwise, you get an infinite
-                            // loop. But for i > 0 it would skip one character. 
-                            // You would not find the array of bytes "48 89 5c
-                            // 24 ..." in "48 89 5c 48 89 5c 24 ...". The
-                            // second "48" would get skipped.
+      bool isReadable =
+        ((protection & 0xFF) == PAGE_READONLY ||
+         (protection & 0xFF) == PAGE_READWRITE ||
+         (protection & 0xFF) == PAGE_WRITECOPY ||
+         (protection & 0xFF) == PAGE_EXECUTE_READ ||
+         (protection & 0xFF) == PAGE_EXECUTE_READWRITE ||
+         (protection & 0xFF) == PAGE_EXECUTE_WRITECOPY)
+        && state == MEM_COMMIT;
+      return isReadable;
+    }
+ 
+    static uintptr_t
+    AobScan(
+      std::string aob)
+    {
+      std::vector<std::string> aobTokens = TokenifyAobString(aob);
 
-                            // There might still be situations that are not
-                            // handled. You likely would need to save the
-                            // address before the inner loop and increase it by
-                            // exactly one for each loop. Currently every part
-                            // of memory is only looked at once.
+      const size_t maxRegionsToCheck = 10000;
+      const size_t patternSize = aobTokens.size();
 
-                            if (i == 0) currentAddress++;
-                            break;
-                        }
-                        else if (i == aobTokens.size() - 1)
-                        {
-                            uintptr_t signature = currentAddress - aobTokens.size() + 1;
-                            Log("Found signature at ", NumberToHexString(signature));
-                            return signature;
-                        }
-                        currentAddress++;
-                    }
-                }
-            }
-            else
-            {
-                // modded;
-                // Log("Skipped region: ", NumberToHexString(regionStart));
-            }
+      DWORD processId = GetCurrentProcessId();
+      uintptr_t regionStart = GetProcessBaseAddress(processId);
 
-            numRegionsChecked++;
-            regionStart += memoryInfo.RegionSize;
+      Log("Process name: ", GetCurrentProcessName());
+      Log("Process ID: ", processId);
+      Log("Process base address: ", NumberToHexString(regionStart));
+      Log("AOB: ", aob);
+
+      if (!VerifyAob(aob))
+      {
+        return 0;
+      };
+
+      //
+      // modded:
+      // The vanilla implementation left out some matches. For example, it
+      // checked one region at a time. It missed matches that reached over
+      // region boundaries.
+
+      MEMORY_BASIC_INFORMATION memoryInfo;
+      uintptr_t currentAddress = 0;
+      size_t numRegionsChecked = 0;
+      while (numRegionsChecked < maxRegionsToCheck)
+      {
+        bool success = TryGetMemoryInformation(&memoryInfo, regionStart);
+        if (!success)
+        {
+          break;
         }
 
-        Log("Stopped at: ", NumberToHexString(currentAddress), ", num regions checked: ", numRegionsChecked);
-        ShowErrorPopup("Could not find signature!");
-        return 0;
+        regionStart = (uintptr_t)memoryInfo.BaseAddress;
+        uintptr_t regionSize = (uintptr_t)memoryInfo.RegionSize;
+        uintptr_t regionEnd = regionStart + regionSize;
+
+        if (!IsMemoryReadable(memoryInfo))
+        {
+          ++numRegionsChecked;
+          regionStart += regionSize;
+        }
+        else
+        {
+          currentAddress = regionStart;
+          while (currentAddress < regionEnd - patternSize)
+          {
+            bool matched = true;
+            for (size_t i = 0; i < patternSize; ++i)
+            {
+              // wildcard
+              if (aobTokens[i] == muAobMask)
+              {
+                continue;
+              }
+
+              unsigned char actual =
+                *reinterpret_cast<const unsigned char*>(currentAddress + i);
+              unsigned char expected =
+                static_cast<unsigned char>(std::stoul(aobTokens[i], nullptr, 16));
+              if (actual != expected)
+              {
+                matched = false;
+                break;
+              }
+            }
+
+            if (matched)
+            {
+              Log("Found signature at ", NumberToHexString(currentAddress));
+              return currentAddress;
+            }
+
+            ++currentAddress;
+            if (currentAddress == regionEnd - patternSize)
+            {
+              ++numRegionsChecked;
+              regionStart += regionSize;
+
+              success = TryGetMemoryInformation(&memoryInfo, regionStart);
+              if (!success)
+              {
+                break;
+              }
+
+              regionStart = (uintptr_t)memoryInfo.BaseAddress;
+              regionSize = (uintptr_t)memoryInfo.RegionSize;
+              regionEnd = regionStart + regionSize;
+
+              if (!IsMemoryReadable(memoryInfo))
+              {
+                ++numRegionsChecked;
+                regionStart += regionSize;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      Log("Stopped at: ", NumberToHexString(currentAddress), ", num regions checked: ", numRegionsChecked);
+      ShowErrorPopup("Could not find signature!");
+      return 0;
     }
 
     static std::vector<unsigned char> StringAobToRawAob(std::string aob)

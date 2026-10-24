@@ -11,7 +11,7 @@ using namespace mINI;
 using namespace ModUtils;
 
 const std::string author = "SchuhBaum";
-const std::string version = "0.2.3";
+const std::string version = "0.2.4";
 
 // NOTE: Patches might also introduce cases where the searched array of bytes
 //       is not unique anymore. Check if matches are unique.
